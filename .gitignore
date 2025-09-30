@@ -1,0 +1,72 @@
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Logs and debug
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python (backend/LLM)
+__pycache__/
+*.py[cod]
+*.egg
+*.egg-info/
+dist/
+build/
+.env
+.env.*
+venv/
+*.sqlite3
+
+# Node.js/JavaScript (frontend/backend)
+node_modules/
+npm-debug.log
+yarn.lock
+*.env
+.env.local
+.env.development
+.env.production
+
+# React/Next.js
+.next/
+out/
+coverage/
+*.tsbuildinfo
+
+# Flutter (if using Flutter web)
+build/
+.dart_tool/
+.packages
+pubspec.lock
+
+# Database
+*.db
+*.sqlite
+*.sql.bak
+
+# Docker
+*.pid
+
+# VS Code/IDE
+.vscode/
+.idea/
+*.swp
+
+# Test/output
+coverage/
+junit.xml
+*.coverage
+
+# Deployment/secrets
+infra/secrets/
+docker-compose.override.yml
+
+# Miscellaneous
+*.bak
+*.tmp
+
+# Ignore system-wide config/data that isn’t part of codebase
+infra/.terraform/
