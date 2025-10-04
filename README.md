@@ -8,6 +8,7 @@ AI/ML powered application that converts natural language text to SQL queries.
 - **Backend**: FastAPI
 - **Database**: MySQL & PostgreSQL
 - **AI/ML**: Natural language processing for SQL generation
+- **Model**: mradermacher/natural-sql-7b-i1-GGUF
 
 ## Features
 
@@ -19,10 +20,7 @@ AI/ML powered application that converts natural language text to SQL queries.
 ## Quick Start with Docker
 
 ```bash
-# Start all services
-./start.sh
-
-# Or manually with docker-compose
+# Start all services with docker-compose
 docker-compose up --build
 ```
 
