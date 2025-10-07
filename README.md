@@ -2,6 +2,32 @@
 
 AI/ML powered application that converts natural language text to SQL queries.
 
+## 📸 Screenshots
+
+![Landing Page](./demo/images/landing.avif)
+*Welcome to Text to SQL Converter*
+
+![Main Interface](./demo/images/main-interface.avif)
+*Convert natural language to SQL queries with ease*
+
+![Database Schema](./demo/images/schema.avif)
+*Database schema visualization*
+
+![Query Results](./demo/images/query-result.avif)
+*Real-time SQL generation and execution*
+
+![Session Management](./demo/images/session.avif)
+*Manage your query sessions*
+
+<!-- ## 🎥 Demo Video
+
+<video width="800" controls>
+  <source src="./assets/demo-video.webm" type="video/webm">
+  Your browser does not support the video tag.
+</video>
+
+*Watch the Text to SQL converter in action* -->
+
 ## Tech Stack
 
 - **Frontend**: React
@@ -10,7 +36,7 @@ AI/ML powered application that converts natural language text to SQL queries.
 - **AI/ML**: Natural language processing for SQL generation
 - **Model**: mradermacher/natural-sql-7b-i1-GGUF
 
-## Features
+## ✨ Features
 
 - Convert plain English to SQL queries
 - Real-time query generation
