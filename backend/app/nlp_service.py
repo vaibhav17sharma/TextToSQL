@@ -1,19 +1,54 @@
 from typing import List, Dict, Any
 import os
+import sys
+import time
+import threading
 from llama_cpp import Llama
-from huggingface_hub import hf_hub_download
-from tqdm import tqdm
+from huggingface_hub import hf_hub_download, HfFileSystem
 import logging
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
 logger = logging.getLogger(__name__)
 
-def download_progress_callback(filename, current, total):
-    """Callback to show download progress"""
-    if total > 0:
-        percent = (current / total) * 100
-        logger.info(f"Downloading {filename}: {percent:.1f}% ({current:,}/{total:,} bytes)")
+def track_download_progress(cache_dir, repo_id, total_size_mb):
+    """Track download progress by monitoring .incomplete file"""
+    def monitor():
+        count = 0
+        while True:
+            time.sleep(30)
+            count += 1
+            
+            # Find .incomplete file
+            incomplete_file = None
+            blob_dir = os.path.join(cache_dir, f"models--{repo_id.replace('/', '--')}", "blobs")
+            
+            if os.path.exists(blob_dir):
+                for file in os.listdir(blob_dir):
+                    if file.endswith('.incomplete'):
+                        incomplete_file = os.path.join(blob_dir, file)
+                        break
+            
+            if incomplete_file and os.path.exists(incomplete_file):
+                try:
+                    current_size_mb = os.path.getsize(incomplete_file) / (1024 * 1024)
+                    progress = (current_size_mb / total_size_mb) * 100
+                    logger.info(f"📥 Download progress: {progress:.1f}% ({current_size_mb:.1f}/{total_size_mb:.1f} MB)")
+                    sys.stdout.flush()
+                except:
+                    logger.info(f"🔄 Download in progress... ({count * 30}s elapsed)")
+                    sys.stdout.flush()
+            else:
+                logger.info(f"🔄 Download in progress... ({count * 30}s elapsed)")
+                sys.stdout.flush()
+    
+    thread = threading.Thread(target=monitor, daemon=True)
+    thread.start()
+    return thread
 
 class NLPService:
     def __init__(self):
@@ -28,20 +63,39 @@ class NLPService:
             cache_dir = "./models"
             os.makedirs(cache_dir, exist_ok=True)
             
-            logger.info("📥 Checking for model download...")
-            logger.info("Model: mradermacher/natural-sql-7b-i1-GGUF")
-            logger.info("This may take a few minutes on first run...")
+            repo_id = "mradermacher/natural-sql-7b-i1-GGUF"
+            filename = "natural-sql-7b.i1-Q4_K_M.gguf"
             
-            # Download model if not exists (with progress)
+            logger.info(f"📥 Model: {repo_id}")
+            logger.info(f"📄 File: {filename}")
+            
+            # Get file size
+            try:
+                fs = HfFileSystem()
+                file_info = fs.info(f"{repo_id}/{filename}")
+                file_size_mb = file_info['size'] / (1024 * 1024)
+                logger.info(f"📊 Model size: {file_size_mb:.1f} MB")
+            except:
+                file_size_mb = 4000
+                logger.info("📊 Model size: ~4000 MB")
+            
+            logger.info("⬇️ Starting download (progress updates every 30s)...")
+            sys.stdout.flush()
+            
+            # Start progress tracking
+            progress_thread = track_download_progress(cache_dir, repo_id, file_size_mb)
+            
+            # Download model
             model_path = hf_hub_download(
-                repo_id="mradermacher/natural-sql-7b-i1-GGUF",
-                filename="natural-sql-7b.i1-Q4_K_M.gguf",
+                repo_id=repo_id,
+                filename=filename,
                 cache_dir=cache_dir,
                 resume_download=True
             )
             
-            logger.info(f"✅ Model downloaded to: {model_path}")
+            logger.info(f"✅ Download completed: {model_path}")
             logger.info("🔄 Loading model into memory...")
+            sys.stdout.flush()
             
             # Initialize Llama model with verbose output
             self.model = Llama(
@@ -52,11 +106,13 @@ class NLPService:
             )
             
             logger.info("🎉 Model loaded successfully!")
-            logger.info("Ready to convert natural language to SQL queries.")
+            logger.info("✨ Ready to convert natural language to SQL queries")
+            sys.stdout.flush()
             
         except Exception as e:
             logger.error(f"❌ Failed to load model: {e}")
-            logger.info("🔄 Falling back to basic SQL generation...")
+            logger.error("🚫 Model loading failed")
+            sys.stdout.flush()
             self.model = None
 
     def text_to_sql(self, text: str, schema: List[Dict], context: List[str] = None) -> str:
