@@ -19,14 +19,11 @@ AI/ML powered application that converts natural language text to SQL queries.
 ![Session Management](./demo/images/session.avif)
 *Manage your query sessions*
 
-<!-- ## 🎥 Demo Video
+## 🎥 Demo Video
 
-<video width="800" controls>
-  <source src="./assets/demo-video.webm" type="video/webm">
-  Your browser does not support the video tag.
-</video>
+[![Demo Video](https://img.youtube.com/vi/AtDVDImZVpU/0.jpg)](https://youtu.be/AtDVDImZVpU)
 
-*Watch the Text to SQL converter in action* -->
+*Watch the Text to SQL converter in action*
 
 ## Tech Stack
 
