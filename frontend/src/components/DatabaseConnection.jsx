@@ -52,7 +52,7 @@ export default function DatabaseConnection() {
       const formData = new FormData();
       formData.append('file', file);
       
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/connect-db/file`, {
+      const response = await fetch('/api/connect-db/file', {
         method: 'POST',
         body: formData,
       });
