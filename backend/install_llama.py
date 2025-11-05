@@ -24,37 +24,9 @@ def check_cuda_available():
         return False
 
 def install_llama_cpp():
-    """Install appropriate version of llama-cpp-python"""
-    if check_cuda_available():
-        print("🚀 CUDA detected, trying prebuilt CUDA wheel...")
-        try:
-            # Uninstall existing version first
-            subprocess.run([sys.executable, "-m", "pip", "uninstall", "llama-cpp-python", "-y"], 
-                         capture_output=True)
-            
-            # Try CUDA 12.1 wheel first
-            subprocess.check_call([
-                sys.executable, "-m", "pip", "install", 
-                "llama-cpp-python==0.2.20", 
-                "--extra-index-url", "https://abetlen.github.io/llama-cpp-python/whl/cu121",
-                "--force-reinstall", 
-                "--no-cache-dir"
-            ])
-            print("✅ CUDA wheel installed successfully")
-            
-            # Verify CUDA support
-            try:
-                import llama_cpp
-                print(f"🔍 llama-cpp version: {llama_cpp.__version__}")
-            except Exception as e:
-                print(f"⚠️ Could not verify llama-cpp: {e}")
-        except subprocess.CalledProcessError as e:
-            print(f"⚠️ CUDA wheel failed: {e}")
-            print("Installing CPU version...")
-            install_cpu_version()
-    else:
-        print("💻 No CUDA detected, installing CPU version...")
-        install_cpu_version()
+    """Install CPU-only version of llama-cpp-python"""
+    print("💻 Installing CPU-only llama-cpp-python...")
+    install_cpu_version()
 
 def install_cpu_version():
     """Install CPU-only version"""

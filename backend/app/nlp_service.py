@@ -6,7 +6,6 @@ import threading
 from llama_cpp import Llama
 from huggingface_hub import hf_hub_download, HfFileSystem
 import logging
-import subprocess
 
 # Configure logging
 logging.basicConfig(
@@ -129,28 +128,15 @@ class NLPService:
             logger.info("🔄 Loading model into memory...")
             sys.stdout.flush()
             
-            # Initialize Llama model with GPU acceleration if available
-            gpu_available = self._check_gpu_available()
-            
-            if gpu_available:
-                try:
-                    logger.info("🚀 Attempting GPU acceleration...")
-                    self.model = Llama(
-                        model_path=model_path,
-                        n_ctx=2048,
-                        n_gpu_layers=32,  # Start with reasonable number
-                        verbose=True  # Enable to see GPU usage
-                    )
-                    # Verify GPU is actually being used
-                    self._verify_gpu_usage()
-                    logger.info("✨ Model loaded with GPU acceleration")
-                except Exception as gpu_error:
-                    logger.info(f"⚠️ GPU failed: {str(gpu_error)[:200]}")
-                    logger.info("🔄 Falling back to CPU...")
-                    self._load_cpu_model(model_path)
-            else:
-                logger.info("💻 Loading model on CPU...")
-                self._load_cpu_model(model_path)
+            # Load model on CPU
+            logger.info("💻 Loading model on CPU...")
+            self.model = Llama(
+                model_path=model_path,
+                n_ctx=2048,
+                n_threads=4,
+                verbose=False
+            )
+            logger.info("💻 Model loaded on CPU")
             
             logger.info("🎉 Model loaded successfully!")
             logger.info("✨ Ready to convert natural language to SQL queries")
@@ -183,9 +169,6 @@ Generate a SQL query for the following request.
 """
         
         # Generate SQL using the model
-        logger.info("🧠 Starting inference...")
-        start_time = time.time()
-        
         response = self.model(
             prompt,
             max_tokens=256,
@@ -193,12 +176,6 @@ Generate a SQL query for the following request.
             stop=["\n\n", "###"],
             echo=False
         )
-        
-        inference_time = time.time() - start_time
-        logger.info(f"⏱️ Inference completed in {inference_time:.2f}s")
-        
-        # Check GPU usage after inference
-        self._verify_gpu_usage()
         
         sql = response['choices'][0]['text'].strip()
         
@@ -229,71 +206,7 @@ Generate a SQL query for the following request.
         """Format error message with the generated query for user review"""
         return f"Query execution failed. Here's what I generated - can you check if this looks right?\n\nGenerated Query: {generated_query}\n\nOriginal Request: {original_text}\n\nError: {error}\n\nI'm not confident about this query. Please review and let me know if adjustments are needed."
 
-    def _check_gpu_available(self) -> bool:
-        """Check if GPU is available for llama-cpp-python"""
-        logger.info("🔍 Checking GPU availability...")
-        
-        # Check NVIDIA runtime
-        try:
-            import subprocess
-            result = subprocess.run(['nvidia-smi'], capture_output=True, text=True, timeout=5)
-            if result.returncode == 0:
-                logger.info("✅ nvidia-smi detected")
-                gpu_detected = True
-            else:
-                logger.info("❌ nvidia-smi failed")
-                gpu_detected = False
-        except:
-            logger.info("❌ nvidia-smi not available")
-            gpu_detected = False
-        
-        # Check llama-cpp-python GPU support
-        try:
-            from llama_cpp import Llama
-            # Try creating a test model with GPU to check support
-            test_model = Llama(model_path=None, n_gpu_layers=1, verbose=False)
-            gpu_support = True
-            logger.info("🔧 llama-cpp GPU support: True")
-        except:
-            try:
-                # Alternative check - look for CUDA in llama-cpp
-                import llama_cpp
-                gpu_support = hasattr(llama_cpp, 'llama_supports_gpu_offload')
-                logger.info(f"🔧 llama-cpp GPU support: {gpu_support}")
-            except Exception as e:
-                logger.info(f"❌ llama-cpp GPU check failed: {e}")
-                gpu_support = False
-        
-        # Check environment variables
-        cuda_visible = os.environ.get('NVIDIA_VISIBLE_DEVICES', 'none')
-        logger.info(f"🌍 NVIDIA_VISIBLE_DEVICES: {cuda_visible}")
-        
-        # If nvidia-smi works, assume GPU support and let Llama handle it
-        final_result = gpu_detected
-        logger.info(f"🎯 Final GPU availability: {final_result}")
-        return final_result
-    
-    def _verify_gpu_usage(self):
-        """Verify GPU is actually being used"""
-        try:
-            import subprocess
-            result = subprocess.run(['nvidia-smi', '--query-gpu=memory.used', '--format=csv,noheader,nounits'], 
-                                  capture_output=True, text=True, timeout=5)
-            if result.returncode == 0:
-                gpu_memory = result.stdout.strip()
-                logger.info(f"💾 GPU Memory Usage: {gpu_memory} MB")
-        except:
-            logger.info("⚠️ Could not verify GPU usage")
-    
-    def _load_cpu_model(self, model_path: str):
-        """Load model on CPU"""
-        self.model = Llama(
-            model_path=model_path,
-            n_ctx=2048,
-            n_threads=4,
-            verbose=False
-        )
-        logger.info("💻 Model loaded on CPU")
+
 
     def get_explanation(self, sql: str, original_query: str) -> str:
         """Generate explanation for the SQL query"""
