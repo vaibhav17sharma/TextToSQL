@@ -26,18 +26,28 @@ def check_cuda_available():
 def install_llama_cpp():
     """Install appropriate version of llama-cpp-python"""
     if check_cuda_available():
-        print("🚀 CUDA detected, installing prebuilt GPU wheel...")
+        print("🚀 CUDA detected, building with CUDA support...")
         try:
+            # Set environment for CUDA build
+            env = os.environ.copy()
+            env['CMAKE_ARGS'] = '-DLLAMA_CUBLAS=ON -DCMAKE_CUDA_ARCHITECTURES=native'
+            env['FORCE_CMAKE'] = '1'
+            
+            # Uninstall existing version first
+            subprocess.run([sys.executable, "-m", "pip", "uninstall", "llama-cpp-python", "-y"], 
+                         capture_output=True)
+            
             subprocess.check_call([
                 sys.executable, "-m", "pip", "install", 
                 "llama-cpp-python==0.2.20", 
-                "--extra-index-url", "https://abetlen.github.io/llama-cpp-python/whl/cu121",
                 "--force-reinstall", 
-                "--no-cache-dir"
-            ])
-            print("✅ GPU wheel installed successfully")
-        except subprocess.CalledProcessError:
-            print("⚠️ GPU wheel failed, installing CPU version...")
+                "--no-cache-dir",
+                "--no-binary=llama-cpp-python"  # Force compilation
+            ], env=env)
+            print("✅ CUDA-enabled llama-cpp-python built successfully")
+        except subprocess.CalledProcessError as e:
+            print(f"⚠️ CUDA build failed: {e}")
+            print("Installing CPU version...")
             install_cpu_version()
     else:
         print("💻 No CUDA detected, installing CPU version...")

@@ -1,15 +1,18 @@
-FROM python:3.11-slim
+FROM nvidia/cuda:12.1-devel-ubuntu22.04
+
+# Install Python
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-dev \
+    build-essential \
+    cmake \
+    && ln -s /usr/bin/python3 /usr/bin/python
 
 WORKDIR /app
 
 COPY requirements.txt install_llama.py ./
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    gcc \
-    g++ \
-    cmake \
-    && pip install -r requirements.txt \
-    && python install_llama.py
+RUN pip install -r requirements.txt && python install_llama.py
 
 EXPOSE 8000
 
