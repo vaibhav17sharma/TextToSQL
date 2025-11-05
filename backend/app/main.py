@@ -8,11 +8,12 @@ from typing import Optional
 from contextlib import asynccontextmanager
 from .models import (
     DatabaseCredentials, ConnectionResponse, SchemaResponse, 
-    QueryRequest, QueryResponse, ErrorResponse
+    QueryRequest, QueryResponse, ErrorResponse, QuerySubmitResponse, QueryStatusResponse
 )
 from .database import DatabaseManager
 from .nlp_service import NLPService
 from .session_manager import SessionManager
+from .query_queue import QueryQueue, QueryStatus
 
 
 
@@ -30,13 +31,15 @@ async def lifespan(app: FastAPI):
     logger.info("Initializing session manager...")
     logger.info("Initializing NLP service (this may take a few minutes on first run)...")
     
-    # Start background task for session cleanup
+    # Start background tasks
     cleanup_task = asyncio.create_task(session_cleanup_task())
+    queue_processor_task = asyncio.create_task(query_processor_task())
     
     yield
     
     # Shutdown
     cleanup_task.cancel()
+    queue_processor_task.cancel()
     logger.info("Shutting down Text to SQL Converter API...")
 
 app = FastAPI(title="Text to SQL Converter API", lifespan=lifespan)
@@ -47,11 +50,63 @@ async def session_cleanup_task():
         try:
             await asyncio.sleep(300)  # 5 minutes
             session_manager.cleanup_expired_sessions()
+            query_queue.cleanup_old_queries()
             logger.info(f"Session cleanup completed. Active sessions: {session_manager.get_session_count()}")
         except asyncio.CancelledError:
             break
         except Exception as e:
             logger.error(f"Error in session cleanup: {e}")
+
+async def query_processor_task():
+    """Background task to process queued queries"""
+    while True:
+        try:
+            query_id = await query_queue.get_next_query()
+            if query_id:
+                await process_query(query_id)
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error(f"Error in query processor: {e}")
+
+async def process_query(query_id: str):
+    """Process a single query from the queue"""
+    queued_query = query_queue.get_query_status(query_id)
+    if not queued_query:
+        return
+    
+    query_queue.update_query_status(query_id, QueryStatus.PROCESSING)
+    
+    try:
+        db_manager = session_manager.get_session(queued_query.session_id)
+        if not db_manager or not db_manager.is_connected():
+            raise Exception("No database connection for session")
+        
+        # Get schema for context
+        schema = db_manager.get_schema()
+        schema_dict = [table.dict() for table in schema]
+        
+        # Convert natural language to SQL
+        sql = nlp_service.text_to_sql(queued_query.query, schema_dict, queued_query.context)
+        
+        # Execute the query
+        result = db_manager.execute_query(sql)
+        
+        # Get explanation
+        explanation = nlp_service.get_explanation(sql, queued_query.query)
+        
+        query_result = {
+            "sql": result["sql"],
+            "results": result["results"],
+            "execution_time": result["execution_time"],
+            "explanation": explanation
+        }
+        
+        query_queue.update_query_status(query_id, QueryStatus.COMPLETED, result=query_result)
+        
+    except Exception as e:
+        error_message = nlp_service.format_error_with_query(str(e), "", queued_query.query) if hasattr(nlp_service, 'format_error_with_query') else str(e)
+        query_queue.update_query_status(query_id, QueryStatus.FAILED, error=error_message)
 
 app.add_middleware(
     CORSMiddleware,
@@ -63,6 +118,7 @@ app.add_middleware(
 # Global instances
 session_manager = SessionManager()
 nlp_service = NLPService()
+query_queue = QueryQueue()
 
 @app.get("/")
 def read_root():
@@ -149,40 +205,47 @@ def refresh_schema(session_id: str = Header(..., alias="X-Session-ID")):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/query", response_model=QueryResponse)
-def execute_query(request: QueryRequest):
+@app.post("/api/query", response_model=QuerySubmitResponse)
+async def submit_query(request: QueryRequest):
     try:
+        # Validate session exists
         db_manager = session_manager.get_session(request.session_id)
         if not db_manager or not db_manager.is_connected():
             raise HTTPException(status_code=400, detail="No database connection for session")
         
-        # Get schema for context
-        schema = db_manager.get_schema()
-        schema_dict = [table.dict() for table in schema]
+        # Add query to queue
+        query_id = await query_queue.add_query(request.session_id, request.query, request.context)
         
-        # Convert natural language to SQL
-        sql = nlp_service.text_to_sql(request.query, schema_dict, request.context)
+        return QuerySubmitResponse(
+            query_id=query_id,
+            status="queued",
+            message="Query added to processing queue"
+        )
         
-        try:
-            # Execute the query
-            result = db_manager.execute_query(sql)
-            
-            # Get explanation
-            explanation = nlp_service.get_explanation(sql, request.query)
-            
-            return QueryResponse(
-                sql=result["sql"],
-                results=result["results"],
-                execution_time=result["execution_time"],
-                explanation=explanation
-            )
-        except Exception as exec_error:
-            # Query execution failed - show the generated query for review
-            error_message = nlp_service.format_error_with_query(
-                str(exec_error), sql, request.query
-            )
-            raise HTTPException(status_code=400, detail=error_message)
-            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/query/{query_id}/status", response_model=QueryStatusResponse)
+def get_query_status(query_id: str):
+    try:
+        queued_query = query_queue.get_query_status(query_id)
+        if not queued_query:
+            raise HTTPException(status_code=404, detail="Query not found")
+        
+        result = None
+        if queued_query.status == QueryStatus.COMPLETED and queued_query.result:
+            result = QueryResponse(**queued_query.result)
+        
+        return QueryStatusResponse(
+            query_id=query_id,
+            status=queued_query.status.value,
+            result=result,
+            error=queued_query.error,
+            created_at=queued_query.created_at.isoformat()
+        )
+        
     except HTTPException:
         raise
     except Exception as e:
@@ -223,4 +286,22 @@ def cleanup_expired_sessions():
         "success": True,
         "active_sessions": session_manager.get_session_count(),
         "message": "Expired sessions cleaned up"
+    }
+
+@app.get("/api/queue/stats")
+def get_queue_stats():
+    """Get current queue statistics"""
+    total_queries = len(query_queue.queries)
+    queued = sum(1 for q in query_queue.queries.values() if q.status == QueryStatus.QUEUED)
+    processing = sum(1 for q in query_queue.queries.values() if q.status == QueryStatus.PROCESSING)
+    completed = sum(1 for q in query_queue.queries.values() if q.status == QueryStatus.COMPLETED)
+    failed = sum(1 for q in query_queue.queries.values() if q.status == QueryStatus.FAILED)
+    
+    return {
+        "total_queries": total_queries,
+        "queued": queued,
+        "processing": processing,
+        "completed": completed,
+        "failed": failed,
+        "queue_size": query_queue.queue.qsize()
     }

@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from typing import List, Optional, Any, Dict
+from enum import Enum
 
 class DatabaseCredentials(BaseModel):
     type: str  # "credentials" or "file"
@@ -44,3 +45,15 @@ class ErrorResponse(BaseModel):
     error: bool = True
     message: str
     code: Optional[str] = None
+
+class QuerySubmitResponse(BaseModel):
+    query_id: str
+    status: str
+    message: str
+
+class QueryStatusResponse(BaseModel):
+    query_id: str
+    status: str
+    result: Optional[QueryResponse] = None
+    error: Optional[str] = None
+    created_at: str

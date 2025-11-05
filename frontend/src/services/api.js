@@ -77,7 +77,7 @@ export const getSchema = async (sessionId) => {
   }
 };
 
-export const executeQuery = async (query, sessionId) => {
+export const submitQuery = async (query, sessionId) => {
   try {
     const response = await api.post('/api/query', { 
       query, 
@@ -85,8 +85,48 @@ export const executeQuery = async (query, sessionId) => {
     });
     return response.data;
   } catch (error) {
-    throw new Error(error.response?.data?.detail || 'Failed to execute query');
+    throw new Error(error.response?.data?.detail || 'Failed to submit query');
   }
+};
+
+export const getQueryStatus = async (queryId) => {
+  try {
+    const response = await api.get(`/api/query/${queryId}/status`);
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.detail || 'Failed to get query status');
+  }
+};
+
+export const executeQuery = async (query, sessionId) => {
+  // Submit query and poll for result
+  const submission = await submitQuery(query, sessionId);
+  
+  return new Promise((resolve, reject) => {
+    const pollInterval = setInterval(async () => {
+      try {
+        const status = await getQueryStatus(submission.query_id);
+        
+        if (status.status === 'completed') {
+          clearInterval(pollInterval);
+          resolve(status.result);
+        } else if (status.status === 'failed') {
+          clearInterval(pollInterval);
+          reject(new Error(status.error || 'Query failed'));
+        }
+        // Continue polling if status is 'queued' or 'processing'
+      } catch (error) {
+        clearInterval(pollInterval);
+        reject(error);
+      }
+    }, 1000); // Poll every second
+    
+    // Timeout after 30 seconds
+    setTimeout(() => {
+      clearInterval(pollInterval);
+      reject(new Error('Query timeout'));
+    }, 30000);
+  });
 };
 
 export const refreshSchema = async (sessionId) => {
@@ -128,5 +168,14 @@ export const getSessionStats = async () => {
     return response.data;
   } catch (error) {
     throw new Error(error.response?.data?.detail || 'Failed to get session stats');
+  }
+};
+
+export const getQueueStats = async () => {
+  try {
+    const response = await api.get('/api/queue/stats');
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.detail || 'Failed to get queue stats');
   }
 };

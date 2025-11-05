@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, MessageSquare, AlertCircle } from 'lucide-react';
+import { Send, Loader2, MessageSquare, AlertCircle, Clock } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { executeQuery } from '../services/api';
 
@@ -162,9 +162,15 @@ export default function ChatInterface() {
         
         {state.chat.loading && (
           <div className="flex justify-start">
-            <div className="bg-gray-100 rounded-lg p-3 flex items-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Generating SQL query...</span>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center gap-2">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-blue-600" />
+                <span className="text-blue-700">Queued</span>
+              </div>
+              <div className="flex items-center gap-2 ml-4">
+                <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                <span className="text-blue-700">Processing query...</span>
+              </div>
             </div>
           </div>
         )}
