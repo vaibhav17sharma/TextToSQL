@@ -5,9 +5,9 @@ WORKDIR /app
 COPY requirements.txt install_llama.py ./
 RUN apt-get update && apt-get install -y \
     build-essential \
+    gcc \
+    g++ \
     cmake \
-    nvidia-cuda-dev \
-    || true \
     && pip install -r requirements.txt \
     && python install_llama.py
 

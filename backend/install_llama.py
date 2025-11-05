@@ -24,28 +24,9 @@ def check_cuda_available():
         return False
 
 def install_llama_cpp():
-    """Install appropriate version of llama-cpp-python"""
-    if check_cuda_available():
-        print("🚀 CUDA detected, installing GPU-accelerated llama-cpp-python...")
-        try:
-            # Set environment variables for CUDA build
-            env = os.environ.copy()
-            env['CMAKE_ARGS'] = '-DLLAMA_CUBLAS=on'
-            env['FORCE_CMAKE'] = '1'
-            
-            subprocess.check_call([
-                sys.executable, "-m", "pip", "install", 
-                "llama-cpp-python==0.2.20", 
-                "--force-reinstall", 
-                "--no-cache-dir"
-            ], env=env)
-            print("✅ GPU-accelerated llama-cpp-python installed successfully")
-        except subprocess.CalledProcessError:
-            print("⚠️ GPU installation failed, falling back to CPU version...")
-            install_cpu_version()
-    else:
-        print("💻 No CUDA detected, installing CPU-only llama-cpp-python...")
-        install_cpu_version()
+    """Install llama-cpp-python (CPU version for Docker compatibility)"""
+    print("💻 Installing CPU-only llama-cpp-python for Docker compatibility...")
+    install_cpu_version()
 
 def install_cpu_version():
     """Install CPU-only version"""
