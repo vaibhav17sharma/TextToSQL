@@ -1,7 +1,7 @@
+import { ChevronDown, ChevronRight, Key, Link, RefreshCw, Table, Unplug } from 'lucide-react';
 import { useState } from 'react';
-import { Table, ChevronDown, ChevronRight, Key, Link, RefreshCw, Unplug } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { refreshSchema, disconnectDatabase } from '../services/api';
+import { disconnectDatabase, refreshSchema } from '../services/api';
 
 export default function SchemaExplorer() {
   const { state, dispatch } = useApp();
@@ -69,7 +69,7 @@ export default function SchemaExplorer() {
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold flex items-center gap-2">
           <Table className="w-5 h-5" />
-          Database Schema
+          Schema
         </h2>
         <div className="flex items-center gap-2">
           <button

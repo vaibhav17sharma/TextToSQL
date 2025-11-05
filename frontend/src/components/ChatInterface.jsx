@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, MessageSquare, AlertCircle, Clock } from 'lucide-react';
+import { AlertCircle, Clock, Loader2, MessageSquare, Send } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { executeQuery } from '../services/api';
 
@@ -105,11 +105,13 @@ export default function ChatInterface() {
         <h2 className="text-xl font-semibold flex items-center gap-2">
           <MessageSquare className="w-5 h-5" />
           Query Assistant
-          {state.session.sessionId && (
+          <span className='ml-auto'>
+            {state.session.sessionId && (
             <span className="text-xs bg-blue-100 px-2 py-1 rounded text-blue-700">
               Session: {state.session.sessionId.slice(0, 8)}
             </span>
           )}
+          </span>
         </h2>
       </div>
 
