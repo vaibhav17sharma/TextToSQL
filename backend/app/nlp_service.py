@@ -219,12 +219,38 @@ Generate a SQL query for the following request.
 
     def _check_gpu_available(self) -> bool:
         """Check if GPU is available for llama-cpp-python"""
+        logger.info("🔍 Checking GPU availability...")
+        
+        # Check NVIDIA runtime
         try:
-            # Try importing llama_cpp with GPU support
-            from llama_cpp import llama_cpp_lib
-            return hasattr(llama_cpp_lib, 'llama_supports_gpu_offload') and llama_cpp_lib.llama_supports_gpu_offload()
+            import subprocess
+            result = subprocess.run(['nvidia-smi'], capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                logger.info("✅ nvidia-smi detected")
+                gpu_detected = True
+            else:
+                logger.info("❌ nvidia-smi failed")
+                gpu_detected = False
         except:
-            return False
+            logger.info("❌ nvidia-smi not available")
+            gpu_detected = False
+        
+        # Check llama-cpp-python GPU support
+        try:
+            from llama_cpp import llama_cpp_lib
+            gpu_support = hasattr(llama_cpp_lib, 'llama_supports_gpu_offload') and llama_cpp_lib.llama_supports_gpu_offload()
+            logger.info(f"🔧 llama-cpp GPU support: {gpu_support}")
+        except Exception as e:
+            logger.info(f"❌ llama-cpp GPU check failed: {e}")
+            gpu_support = False
+        
+        # Check environment variables
+        cuda_visible = os.environ.get('NVIDIA_VISIBLE_DEVICES', 'none')
+        logger.info(f"🌍 NVIDIA_VISIBLE_DEVICES: {cuda_visible}")
+        
+        final_result = gpu_detected and gpu_support
+        logger.info(f"🎯 Final GPU availability: {final_result}")
+        return final_result
     
     def _load_cpu_model(self, model_path: str):
         """Load model on CPU"""

@@ -5,29 +5,40 @@ import os
 
 def check_cuda_available():
     """Check if CUDA is available on the system"""
+    # Check environment variables first
+    if os.environ.get('NVIDIA_VISIBLE_DEVICES') == 'all':
+        print("🌍 NVIDIA_VISIBLE_DEVICES=all detected")
+        return True
+    
     try:
-        import torch
-        return torch.cuda.is_available()
-    except ImportError:
-        try:
-            # Check nvidia-smi command
-            result = subprocess.run(['nvidia-smi'], capture_output=True, text=True)
-            return result.returncode == 0
-        except FileNotFoundError:
+        # Check nvidia-smi command
+        result = subprocess.run(['nvidia-smi'], capture_output=True, text=True, timeout=10)
+        if result.returncode == 0:
+            print("✅ nvidia-smi available")
+            return True
+        else:
+            print("❌ nvidia-smi failed")
             return False
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        print("❌ nvidia-smi not found or timeout")
+        return False
 
 def install_llama_cpp():
     """Install appropriate version of llama-cpp-python"""
     if check_cuda_available():
         print("🚀 CUDA detected, installing GPU-accelerated llama-cpp-python...")
         try:
+            # Set environment variables for CUDA build
+            env = os.environ.copy()
+            env['CMAKE_ARGS'] = '-DLLAMA_CUBLAS=on'
+            env['FORCE_CMAKE'] = '1'
+            
             subprocess.check_call([
                 sys.executable, "-m", "pip", "install", 
                 "llama-cpp-python==0.2.20", 
                 "--force-reinstall", 
-                "--no-cache-dir",
-                "--extra-index-url", "https://abetlen.github.io/llama-cpp-python/whl/cu121"
-            ])
+                "--no-cache-dir"
+            ], env=env)
             print("✅ GPU-accelerated llama-cpp-python installed successfully")
         except subprocess.CalledProcessError:
             print("⚠️ GPU installation failed, falling back to CPU version...")
