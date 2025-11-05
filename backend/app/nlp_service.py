@@ -137,12 +137,12 @@ class NLPService:
                     self.model = Llama(
                         model_path=model_path,
                         n_ctx=2048,
-                        n_gpu_layers=-1,  # Use all GPU layers
+                        n_gpu_layers=32,  # Start with reasonable number
                         verbose=False
                     )
                     logger.info("✨ Model loaded with GPU acceleration")
                 except Exception as gpu_error:
-                    logger.info(f"⚠️ GPU failed: {str(gpu_error)[:100]}...")
+                    logger.info(f"⚠️ GPU failed: {str(gpu_error)[:200]}")
                     logger.info("🔄 Falling back to CPU...")
                     self._load_cpu_model(model_path)
             else:
@@ -237,18 +237,27 @@ Generate a SQL query for the following request.
         
         # Check llama-cpp-python GPU support
         try:
-            from llama_cpp import llama_cpp_lib
-            gpu_support = hasattr(llama_cpp_lib, 'llama_supports_gpu_offload') and llama_cpp_lib.llama_supports_gpu_offload()
-            logger.info(f"🔧 llama-cpp GPU support: {gpu_support}")
-        except Exception as e:
-            logger.info(f"❌ llama-cpp GPU check failed: {e}")
-            gpu_support = False
+            from llama_cpp import Llama
+            # Try creating a test model with GPU to check support
+            test_model = Llama(model_path=None, n_gpu_layers=1, verbose=False)
+            gpu_support = True
+            logger.info("🔧 llama-cpp GPU support: True")
+        except:
+            try:
+                # Alternative check - look for CUDA in llama-cpp
+                import llama_cpp
+                gpu_support = hasattr(llama_cpp, 'llama_supports_gpu_offload')
+                logger.info(f"🔧 llama-cpp GPU support: {gpu_support}")
+            except Exception as e:
+                logger.info(f"❌ llama-cpp GPU check failed: {e}")
+                gpu_support = False
         
         # Check environment variables
         cuda_visible = os.environ.get('NVIDIA_VISIBLE_DEVICES', 'none')
         logger.info(f"🌍 NVIDIA_VISIBLE_DEVICES: {cuda_visible}")
         
-        final_result = gpu_detected and gpu_support
+        # If nvidia-smi works, assume GPU support and let Llama handle it
+        final_result = gpu_detected
         logger.info(f"🎯 Final GPU availability: {final_result}")
         return final_result
     
