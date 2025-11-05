@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y \
     python3-dev \
     build-essential \
     cmake \
+    ninja-build \
     && ln -s /usr/bin/python3 /usr/bin/python
 
 WORKDIR /app
