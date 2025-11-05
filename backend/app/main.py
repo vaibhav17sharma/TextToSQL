@@ -1,16 +1,20 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, Header
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import tempfile
 import logging
+import asyncio
+from typing import Optional
+from contextlib import asynccontextmanager
 from .models import (
     DatabaseCredentials, ConnectionResponse, SchemaResponse, 
     QueryRequest, QueryResponse, ErrorResponse
 )
 from .database import DatabaseManager
 from .nlp_service import NLPService
+from .session_manager import SessionManager
 
-app = FastAPI(title="Text to SQL Converter API")
+
 
 # Configure logging
 logging.basicConfig(
@@ -19,11 +23,35 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-@app.on_event("startup")
-async def startup_event():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
     logger.info("Starting Text to SQL Converter API...")
-    logger.info("Initializing database manager...")
+    logger.info("Initializing session manager...")
     logger.info("Initializing NLP service (this may take a few minutes on first run)...")
+    
+    # Start background task for session cleanup
+    cleanup_task = asyncio.create_task(session_cleanup_task())
+    
+    yield
+    
+    # Shutdown
+    cleanup_task.cancel()
+    logger.info("Shutting down Text to SQL Converter API...")
+
+app = FastAPI(title="Text to SQL Converter API", lifespan=lifespan)
+
+async def session_cleanup_task():
+    """Background task to clean up expired sessions every 5 minutes"""
+    while True:
+        try:
+            await asyncio.sleep(300)  # 5 minutes
+            session_manager.cleanup_expired_sessions()
+            logger.info(f"Session cleanup completed. Active sessions: {session_manager.get_session_count()}")
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error(f"Error in session cleanup: {e}")
 
 app.add_middleware(
     CORSMiddleware,
@@ -33,7 +61,7 @@ app.add_middleware(
 )
 
 # Global instances
-db_manager = DatabaseManager()
+session_manager = SessionManager()
 nlp_service = NLPService()
 
 @app.get("/")
@@ -43,6 +71,10 @@ def read_root():
 @app.post("/api/connect-db", response_model=ConnectionResponse)
 async def connect_database(credentials: DatabaseCredentials):
     try:
+        # Create new session
+        session_id = session_manager.create_session()
+        db_manager = session_manager.get_session(session_id)
+        
         if credentials.type == "credentials":
             success = db_manager.connect_credentials(
                 host=credentials.host,
@@ -59,7 +91,8 @@ async def connect_database(credentials: DatabaseCredentials):
             return ConnectionResponse(
                 success=True,
                 message="Connected successfully",
-                connection_id="conn_123"
+                connection_id=f"conn_{session_id[:8]}",
+                session_id=session_id
             )
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -67,6 +100,10 @@ async def connect_database(credentials: DatabaseCredentials):
 @app.post("/api/connect-db/file", response_model=ConnectionResponse)
 async def connect_database_file(file: UploadFile = File(...)):
     try:
+        # Create new session
+        session_id = session_manager.create_session()
+        db_manager = session_manager.get_session(session_id)
+        
         # Save uploaded file temporarily
         with tempfile.NamedTemporaryFile(delete=False, suffix=".db") as tmp_file:
             content = await file.read()
@@ -79,7 +116,8 @@ async def connect_database_file(file: UploadFile = File(...)):
             return ConnectionResponse(
                 success=True,
                 message="Connected successfully",
-                connection_id="conn_file_123"
+                connection_id=f"conn_file_{session_id[:8]}",
+                session_id=session_id
             )
     except Exception as e:
         # Clean up temp file on error
@@ -88,10 +126,11 @@ async def connect_database_file(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/api/schema", response_model=SchemaResponse)
-def get_schema():
+def get_schema(session_id: str = Header(..., alias="X-Session-ID")):
     try:
-        if not db_manager.is_connected():
-            raise HTTPException(status_code=400, detail="No database connection")
+        db_manager = session_manager.get_session(session_id)
+        if not db_manager or not db_manager.is_connected():
+            raise HTTPException(status_code=400, detail="No database connection for session")
         
         tables = db_manager.get_schema()
         return SchemaResponse(tables=tables)
@@ -99,10 +138,11 @@ def get_schema():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/schema/refresh", response_model=SchemaResponse)
-def refresh_schema():
+def refresh_schema(session_id: str = Header(..., alias="X-Session-ID")):
     try:
-        if not db_manager.is_connected():
-            raise HTTPException(status_code=400, detail="No database connection")
+        db_manager = session_manager.get_session(session_id)
+        if not db_manager or not db_manager.is_connected():
+            raise HTTPException(status_code=400, detail="No database connection for session")
         
         tables = db_manager.get_schema()
         return SchemaResponse(tables=tables)
@@ -112,8 +152,9 @@ def refresh_schema():
 @app.post("/api/query", response_model=QueryResponse)
 def execute_query(request: QueryRequest):
     try:
-        if not db_manager.is_connected():
-            raise HTTPException(status_code=400, detail="No database connection")
+        db_manager = session_manager.get_session(request.session_id)
+        if not db_manager or not db_manager.is_connected():
+            raise HTTPException(status_code=400, detail="No database connection for session")
         
         # Get schema for context
         schema = db_manager.get_schema()
@@ -148,16 +189,38 @@ def execute_query(request: QueryRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/connection/status")
-def connection_status():
+def connection_status(session_id: str = Header(..., alias="X-Session-ID")):
+    db_manager = session_manager.get_session(session_id)
+    if not db_manager:
+        return {"connected": False, "connection_info": None}
+    
     return {
         "connected": db_manager.is_connected(),
         "connection_info": db_manager.connection_info
     }
 
 @app.post("/api/disconnect")
-def disconnect():
+def disconnect(session_id: str = Header(..., alias="X-Session-ID")):
     try:
-        db_manager.disconnect()
+        session_manager.cleanup_session(session_id)
         return {"success": True, "message": "Disconnected successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/sessions/stats")
+def get_session_stats():
+    """Get current session statistics"""
+    return {
+        "active_sessions": session_manager.get_session_count(),
+        "message": "Session statistics"
+    }
+
+@app.post("/api/sessions/cleanup")
+def cleanup_expired_sessions():
+    """Manually trigger cleanup of expired sessions"""
+    session_manager.cleanup_expired_sessions()
+    return {
+        "success": True,
+        "active_sessions": session_manager.get_session_count(),
+        "message": "Expired sessions cleaned up"
+    }

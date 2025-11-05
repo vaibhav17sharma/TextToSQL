@@ -3,6 +3,10 @@ import { createContext, useContext, useReducer } from 'react';
 const AppContext = createContext();
 
 const initialState = {
+  session: {
+    sessionId: null,
+    connectionId: null
+  },
   connection: {
     isConnected: false,
     config: null,
@@ -32,6 +36,10 @@ function appReducer(state, action) {
     case 'SET_CONNECTION_SUCCESS':
       return {
         ...state,
+        session: {
+          sessionId: action.payload.session_id,
+          connectionId: action.payload.connection_id
+        },
         connection: {
           isConnected: true,
           config: action.payload,

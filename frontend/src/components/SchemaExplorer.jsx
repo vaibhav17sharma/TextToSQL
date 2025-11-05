@@ -18,9 +18,11 @@ export default function SchemaExplorer() {
   };
 
   const handleRefreshSchema = async () => {
+    if (!state.session.sessionId) return;
+    
     dispatch({ type: 'SET_SCHEMA_LOADING', payload: true });
     try {
-      const schema = await refreshSchema();
+      const schema = await refreshSchema(state.session.sessionId);
       dispatch({ type: 'SET_SCHEMA_SUCCESS', payload: schema.tables });
     } catch (error) {
       dispatch({ type: 'SET_SCHEMA_ERROR', payload: error.message });
@@ -28,8 +30,10 @@ export default function SchemaExplorer() {
   };
 
   const handleDisconnect = async () => {
+    if (!state.session.sessionId) return;
+    
     try {
-      await disconnectDatabase();
+      await disconnectDatabase(state.session.sessionId);
       dispatch({ type: 'DISCONNECT_DATABASE' });
     } catch (error) {
       dispatch({ type: 'SET_CONNECTION_ERROR', payload: error.message });

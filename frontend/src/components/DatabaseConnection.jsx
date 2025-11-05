@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Database, Upload, Loader2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { connectDatabase, getSchema } from '../services/api';
+import { connectDatabase, connectDatabaseFile, getSchema } from '../services/api';
 
 export default function DatabaseConnection() {
   const { state, dispatch } = useApp();
@@ -30,12 +30,12 @@ export default function DatabaseConnection() {
         port: parseInt(formData.port)
       };
       
-      await connectDatabase(connectionData);
-      dispatch({ type: 'SET_CONNECTION_SUCCESS', payload: formData });
+      const result = await connectDatabase(connectionData);
+      dispatch({ type: 'SET_CONNECTION_SUCCESS', payload: result });
       
       // Fetch schema after successful connection
       dispatch({ type: 'SET_SCHEMA_LOADING', payload: true });
-      const schema = await getSchema();
+      const schema = await getSchema(result.session_id);
       dispatch({ type: 'SET_SCHEMA_SUCCESS', payload: schema.tables });
     } catch (error) {
       dispatch({ type: 'SET_CONNECTION_ERROR', payload: error.message });
@@ -49,24 +49,11 @@ export default function DatabaseConnection() {
     dispatch({ type: 'SET_CONNECTION_LOADING', payload: true });
     
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      
-      const response = await fetch('/api/connect-db/file', {
-        method: 'POST',
-        body: formData,
-      });
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || 'Failed to upload file');
-      }
-      
-      const result = await response.json();
-      dispatch({ type: 'SET_CONNECTION_SUCCESS', payload: { file: file.name } });
+      const result = await connectDatabaseFile(file);
+      dispatch({ type: 'SET_CONNECTION_SUCCESS', payload: result });
       
       dispatch({ type: 'SET_SCHEMA_LOADING', payload: true });
-      const schema = await getSchema();
+      const schema = await getSchema(result.session_id);
       dispatch({ type: 'SET_SCHEMA_SUCCESS', payload: schema.tables });
     } catch (error) {
       dispatch({ type: 'SET_CONNECTION_ERROR', payload: error.message });
@@ -79,6 +66,11 @@ export default function DatabaseConnection() {
         <div className="flex items-center gap-2 text-green-700">
           <Database className="w-5 h-5" />
           <span className="font-medium">Connected to database</span>
+          {state.session.connectionId && (
+            <span className="text-xs bg-green-100 px-2 py-1 rounded">
+              {state.session.connectionId}
+            </span>
+          )}
         </div>
       </div>
     );

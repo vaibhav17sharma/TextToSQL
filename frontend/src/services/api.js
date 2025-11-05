@@ -53,38 +53,80 @@ export const connectDatabase = async (config) => {
   }
 };
 
-export const getSchema = async () => {
+export const connectDatabaseFile = async (file) => {
   try {
-    const response = await api.get('/api/schema');
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post('/api/connect-db/file', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.detail || 'Failed to connect to database file');
+  }
+};
+
+export const getSchema = async (sessionId) => {
+  try {
+    const response = await api.get('/api/schema', {
+      headers: { 'X-Session-ID': sessionId }
+    });
     return response.data;
   } catch (error) {
     throw new Error(error.response?.data?.detail || 'Failed to fetch schema');
   }
 };
 
-export const executeQuery = async (query) => {
+export const executeQuery = async (query, sessionId) => {
   try {
-    const response = await api.post('/api/query', { query });
+    const response = await api.post('/api/query', { 
+      query, 
+      session_id: sessionId 
+    });
     return response.data;
   } catch (error) {
     throw new Error(error.response?.data?.detail || 'Failed to execute query');
   }
 };
 
-export const refreshSchema = async () => {
+export const refreshSchema = async (sessionId) => {
   try {
-    const response = await api.post('/api/schema/refresh');
+    const response = await api.post('/api/schema/refresh', {}, {
+      headers: { 'X-Session-ID': sessionId }
+    });
     return response.data;
   } catch (error) {
     throw new Error(error.response?.data?.detail || 'Failed to refresh schema');
   }
 };
 
-export const disconnectDatabase = async () => {
+export const disconnectDatabase = async (sessionId) => {
   try {
-    const response = await api.post('/api/disconnect');
+    const response = await api.post('/api/disconnect', {}, {
+      headers: { 'X-Session-ID': sessionId }
+    });
     return response.data;
   } catch (error) {
     throw new Error(error.response?.data?.detail || 'Failed to disconnect');
+  }
+};
+
+export const getConnectionStatus = async (sessionId) => {
+  try {
+    const response = await api.get('/api/connection/status', {
+      headers: { 'X-Session-ID': sessionId }
+    });
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.detail || 'Failed to get connection status');
+  }
+};
+
+export const getSessionStats = async () => {
+  try {
+    const response = await api.get('/api/sessions/stats');
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.detail || 'Failed to get session stats');
   }
 };

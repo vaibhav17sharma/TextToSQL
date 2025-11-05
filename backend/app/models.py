@@ -14,6 +14,7 @@ class ConnectionResponse(BaseModel):
     success: bool
     message: str
     connection_id: Optional[str] = None
+    session_id: Optional[str] = None
 
 class Column(BaseModel):
     name: str
@@ -31,6 +32,7 @@ class SchemaResponse(BaseModel):
 class QueryRequest(BaseModel):
     query: str
     context: Optional[List[str]] = []
+    session_id: str
 
 class QueryResponse(BaseModel):
     sql: str
