@@ -6,6 +6,7 @@ import threading
 from llama_cpp import Llama
 from huggingface_hub import hf_hub_download, HfFileSystem
 import logging
+import subprocess
 
 # Configure logging
 logging.basicConfig(
@@ -138,8 +139,10 @@ class NLPService:
                         model_path=model_path,
                         n_ctx=2048,
                         n_gpu_layers=32,  # Start with reasonable number
-                        verbose=False
+                        verbose=True  # Enable to see GPU usage
                     )
+                    # Verify GPU is actually being used
+                    self._verify_gpu_usage()
                     logger.info("✨ Model loaded with GPU acceleration")
                 except Exception as gpu_error:
                     logger.info(f"⚠️ GPU failed: {str(gpu_error)[:200]}")
@@ -180,6 +183,9 @@ Generate a SQL query for the following request.
 """
         
         # Generate SQL using the model
+        logger.info("🧠 Starting inference...")
+        start_time = time.time()
+        
         response = self.model(
             prompt,
             max_tokens=256,
@@ -187,6 +193,12 @@ Generate a SQL query for the following request.
             stop=["\n\n", "###"],
             echo=False
         )
+        
+        inference_time = time.time() - start_time
+        logger.info(f"⏱️ Inference completed in {inference_time:.2f}s")
+        
+        # Check GPU usage after inference
+        self._verify_gpu_usage()
         
         sql = response['choices'][0]['text'].strip()
         
@@ -260,6 +272,18 @@ Generate a SQL query for the following request.
         final_result = gpu_detected
         logger.info(f"🎯 Final GPU availability: {final_result}")
         return final_result
+    
+    def _verify_gpu_usage(self):
+        """Verify GPU is actually being used"""
+        try:
+            import subprocess
+            result = subprocess.run(['nvidia-smi', '--query-gpu=memory.used', '--format=csv,noheader,nounits'], 
+                                  capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                gpu_memory = result.stdout.strip()
+                logger.info(f"💾 GPU Memory Usage: {gpu_memory} MB")
+        except:
+            logger.info("⚠️ Could not verify GPU usage")
     
     def _load_cpu_model(self, model_path: str):
         """Load model on CPU"""
