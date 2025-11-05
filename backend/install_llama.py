@@ -42,9 +42,17 @@ def install_llama_cpp():
                 "llama-cpp-python==0.2.20", 
                 "--force-reinstall", 
                 "--no-cache-dir",
-                "--no-binary=llama-cpp-python"  # Force compilation
+                "--no-binary=llama-cpp-python",  # Force compilation
+                "-v"  # Verbose output
             ], env=env)
             print("✅ CUDA-enabled llama-cpp-python built successfully")
+            
+            # Verify CUDA support was compiled in
+            try:
+                import llama_cpp
+                print(f"🔍 llama-cpp version: {llama_cpp.__version__}")
+            except Exception as e:
+                print(f"⚠️ Could not verify llama-cpp: {e}")
         except subprocess.CalledProcessError as e:
             print(f"⚠️ CUDA build failed: {e}")
             print("Installing CPU version...")
@@ -62,6 +70,13 @@ def install_cpu_version():
         "--no-cache-dir"
     ])
     print("✅ CPU-only llama-cpp-python installed successfully")
+    
+    # Verify installation
+    try:
+        import llama_cpp
+        print(f"🔍 llama-cpp version: {llama_cpp.__version__}")
+    except Exception as e:
+        print(f"⚠️ Could not verify llama-cpp: {e}")
 
 if __name__ == "__main__":
     install_llama_cpp()
