@@ -128,13 +128,26 @@ class NLPService:
             logger.info("🔄 Loading model into memory...")
             sys.stdout.flush()
             
-            # Initialize Llama model with verbose output
-            self.model = Llama(
-                model_path=model_path,
-                n_ctx=2048,
-                n_threads=4,
-                verbose=True  # Enable verbose output for loading progress
-            )
+            # Initialize Llama model with GPU acceleration if available
+            gpu_available = self._check_gpu_available()
+            
+            if gpu_available:
+                try:
+                    logger.info("🚀 Attempting GPU acceleration...")
+                    self.model = Llama(
+                        model_path=model_path,
+                        n_ctx=2048,
+                        n_gpu_layers=-1,  # Use all GPU layers
+                        verbose=False
+                    )
+                    logger.info("✨ Model loaded with GPU acceleration")
+                except Exception as gpu_error:
+                    logger.info(f"⚠️ GPU failed: {str(gpu_error)[:100]}...")
+                    logger.info("🔄 Falling back to CPU...")
+                    self._load_cpu_model(model_path)
+            else:
+                logger.info("💻 Loading model on CPU...")
+                self._load_cpu_model(model_path)
             
             logger.info("🎉 Model loaded successfully!")
             logger.info("✨ Ready to convert natural language to SQL queries")
@@ -203,6 +216,25 @@ Generate a SQL query for the following request.
     def format_error_with_query(self, error: str, generated_query: str, original_text: str) -> str:
         """Format error message with the generated query for user review"""
         return f"Query execution failed. Here's what I generated - can you check if this looks right?\n\nGenerated Query: {generated_query}\n\nOriginal Request: {original_text}\n\nError: {error}\n\nI'm not confident about this query. Please review and let me know if adjustments are needed."
+
+    def _check_gpu_available(self) -> bool:
+        """Check if GPU is available for llama-cpp-python"""
+        try:
+            # Try importing llama_cpp with GPU support
+            from llama_cpp import llama_cpp_lib
+            return hasattr(llama_cpp_lib, 'llama_supports_gpu_offload') and llama_cpp_lib.llama_supports_gpu_offload()
+        except:
+            return False
+    
+    def _load_cpu_model(self, model_path: str):
+        """Load model on CPU"""
+        self.model = Llama(
+            model_path=model_path,
+            n_ctx=2048,
+            n_threads=4,
+            verbose=False
+        )
+        logger.info("💻 Model loaded on CPU")
 
     def get_explanation(self, sql: str, original_query: str) -> str:
         """Generate explanation for the SQL query"""

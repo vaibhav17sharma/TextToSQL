@@ -2,9 +2,10 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-COPY requirements.txt .
+COPY requirements.txt install_llama.py ./
 RUN apt-get update && apt-get install -y build-essential \
-    && pip install -r requirements.txt
+    && pip install -r requirements.txt \
+    && python install_llama.py
 
 EXPOSE 8000
 
