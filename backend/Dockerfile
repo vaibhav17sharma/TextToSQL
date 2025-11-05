@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.1-devel-ubuntu22.04
+FROM nvidia/cuda:12.6-devel-ubuntu22.04
 
 # Install Python
 RUN apt-get update && apt-get install -y \

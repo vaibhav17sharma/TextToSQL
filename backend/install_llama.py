@@ -30,7 +30,7 @@ def install_llama_cpp():
         try:
             # Set environment for CUDA build
             env = os.environ.copy()
-            env['CMAKE_ARGS'] = '-DLLAMA_CUBLAS=ON -DCMAKE_CUDA_ARCHITECTURES=native'
+            env['CMAKE_ARGS'] = '-DLLAMA_CUBLAS=ON'
             env['FORCE_CMAKE'] = '1'
             
             # Uninstall existing version first
