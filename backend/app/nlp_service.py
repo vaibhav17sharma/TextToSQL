@@ -15,44 +15,54 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-def track_download_progress(cache_dir, repo_id, total_size_mb):
-    """Track download progress by monitoring .incomplete file"""
-    def monitor():
-        count = 0
-        while True:
-            time.sleep(30)
-            count += 1
-            
-            # Find .incomplete file
-            incomplete_file = None
-            blob_dir = os.path.join(cache_dir, f"models--{repo_id.replace('/', '--')}", "blobs")
-            
-            if os.path.exists(blob_dir):
-                for file in os.listdir(blob_dir):
-                    if file.endswith('.incomplete'):
-                        incomplete_file = os.path.join(blob_dir, file)
-                        break
-            
-            if incomplete_file and os.path.exists(incomplete_file):
-                try:
-                    current_size_mb = os.path.getsize(incomplete_file) / (1024 * 1024)
-                    progress = (current_size_mb / total_size_mb) * 100
-                    logger.info(f"📥 Download progress: {progress:.1f}% ({current_size_mb:.1f}/{total_size_mb:.1f} MB)")
-                    sys.stdout.flush()
-                except:
-                    logger.info(f"🔄 Download in progress... ({count * 30}s elapsed)")
-                    sys.stdout.flush()
-            else:
-                logger.info(f"🔄 Download in progress... ({count * 30}s elapsed)")
-                sys.stdout.flush()
+class DownloadTracker:
+    def __init__(self):
+        self.stop_tracking = False
     
-    thread = threading.Thread(target=monitor, daemon=True)
-    thread.start()
-    return thread
+    def track_download_progress(self, cache_dir, repo_id, total_size_mb):
+        """Track download progress by monitoring .incomplete file"""
+        def monitor():
+            count = 0
+            while not self.stop_tracking:
+                time.sleep(30)
+                count += 1
+                
+                # Find .incomplete file
+                incomplete_file = None
+                blob_dir = os.path.join(cache_dir, f"models--{repo_id.replace('/', '--')}", "blobs")
+                
+                if os.path.exists(blob_dir):
+                    for file in os.listdir(blob_dir):
+                        if file.endswith('.incomplete'):
+                            incomplete_file = os.path.join(blob_dir, file)
+                            break
+                
+                if incomplete_file and os.path.exists(incomplete_file):
+                    try:
+                        current_size_mb = os.path.getsize(incomplete_file) / (1024 * 1024)
+                        progress = (current_size_mb / total_size_mb) * 100
+                        logger.info(f"📥 Download progress: {progress:.1f}% ({current_size_mb:.1f}/{total_size_mb:.1f} MB)")
+                        sys.stdout.flush()
+                    except:
+                        logger.info(f"🔄 Download in progress... ({count * 30}s elapsed)")
+                        sys.stdout.flush()
+                else:
+                    # No incomplete file found, download might be complete
+                    if count > 1:  # Only log if we've been tracking for a while
+                        logger.info(f"🔄 Download in progress... ({count * 30}s elapsed)")
+                        sys.stdout.flush()
+        
+        thread = threading.Thread(target=monitor, daemon=True)
+        thread.start()
+        return thread
+    
+    def stop(self):
+        self.stop_tracking = True
 
 class NLPService:
     def __init__(self):
         self.model = None
+        self.download_tracker = None
         self._load_model()
     
     def _load_model(self):
@@ -79,21 +89,42 @@ class NLPService:
                 file_size_mb = 4000
                 logger.info("📊 Model size: ~4000 MB")
             
-            logger.info("⬇️ Starting download (progress updates every 30s)...")
-            sys.stdout.flush()
+            # Check if model already exists locally
+            expected_path = os.path.join(cache_dir, f"models--{repo_id.replace('/', '--')}", "snapshots")
+            model_exists = False
             
-            # Start progress tracking
-            progress_thread = track_download_progress(cache_dir, repo_id, file_size_mb)
+            if os.path.exists(expected_path):
+                for snapshot_dir in os.listdir(expected_path):
+                    snapshot_path = os.path.join(expected_path, snapshot_dir, filename)
+                    if os.path.exists(snapshot_path):
+                        model_exists = True
+                        model_path = snapshot_path
+                        logger.info(f"✅ Model already downloaded: {model_path}")
+                        break
             
-            # Download model
-            model_path = hf_hub_download(
-                repo_id=repo_id,
-                filename=filename,
-                cache_dir=cache_dir,
-                resume_download=True
-            )
-            
-            logger.info(f"✅ Download completed: {model_path}")
+            if not model_exists:
+                logger.info("⬇️ Starting download (progress updates every 30s)...")
+                sys.stdout.flush()
+                
+                # Start progress tracking
+                self.download_tracker = DownloadTracker()
+                progress_thread = self.download_tracker.track_download_progress(cache_dir, repo_id, file_size_mb)
+                
+                # Download model
+                model_path = hf_hub_download(
+                    repo_id=repo_id,
+                    filename=filename,
+                    cache_dir=cache_dir,
+                    resume_download=True
+                )
+                
+                # Stop progress tracking
+                if self.download_tracker:
+                    self.download_tracker.stop()
+                
+                logger.info(f"✅ Download completed: {model_path}")
+            else:
+                logger.info("📁 Using existing model file")
             logger.info("🔄 Loading model into memory...")
             sys.stdout.flush()
             
