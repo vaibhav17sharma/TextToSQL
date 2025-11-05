@@ -24,9 +24,24 @@ def check_cuda_available():
         return False
 
 def install_llama_cpp():
-    """Install llama-cpp-python (CPU version for Docker compatibility)"""
-    print("💻 Installing CPU-only llama-cpp-python for Docker compatibility...")
-    install_cpu_version()
+    """Install appropriate version of llama-cpp-python"""
+    if check_cuda_available():
+        print("🚀 CUDA detected, installing prebuilt GPU wheel...")
+        try:
+            subprocess.check_call([
+                sys.executable, "-m", "pip", "install", 
+                "llama-cpp-python==0.2.20", 
+                "--extra-index-url", "https://abetlen.github.io/llama-cpp-python/whl/cu121",
+                "--force-reinstall", 
+                "--no-cache-dir"
+            ])
+            print("✅ GPU wheel installed successfully")
+        except subprocess.CalledProcessError:
+            print("⚠️ GPU wheel failed, installing CPU version...")
+            install_cpu_version()
+    else:
+        print("💻 No CUDA detected, installing CPU version...")
+        install_cpu_version()
 
 def install_cpu_version():
     """Install CPU-only version"""
