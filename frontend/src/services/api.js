@@ -129,11 +129,11 @@ export const executeQuery = async (query, sessionId, onStatsUpdate = null) => {
       }
     }, 1000); // Poll every second
     
-    // Timeout after 30 seconds
+    // Timeout after 60 seconds
     setTimeout(() => {
       clearInterval(pollInterval);
       reject(new Error('Query timeout'));
-    }, 30000);
+    }, 60000);
   });
 };
 

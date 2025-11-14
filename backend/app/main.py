@@ -321,8 +321,8 @@ async def load_context(session_id: str = Header(..., alias="X-Session-ID")):
         if not schema:
             raise HTTPException(status_code=400, detail="No tables found in database")
         
-        # Load context to NLP service
-        nlp_service.load_context(schema)
+        # Load context to NLP service asynchronously
+        await asyncio.get_event_loop().run_in_executor(None, nlp_service.load_context, schema)
         
         # Execute sample query for first table only
         sample_results = []

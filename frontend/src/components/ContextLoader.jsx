@@ -31,7 +31,12 @@ export default function ContextLoader() {
     setLoadResult(null);
     
     try {
-      const result = await loadContext(state.session.sessionId);
+      const result = await Promise.race([
+        loadContext(state.session.sessionId),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Context loading timeout')), 90000)
+        )
+      ]);
       setLoadResult(result);
       setContextStatus({ loaded: true, message: 'Context loaded successfully' });
     } catch (error) {
