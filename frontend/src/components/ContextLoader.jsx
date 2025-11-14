@@ -70,9 +70,14 @@ export default function ContextLoader({ contextLoaded, setContextLoaded }) {
               </div>
             ) : (
               <div>
-                <code className="text-xs bg-gray-800 text-green-400 p-2 rounded block mb-2">
-                  {sample.sql}
-                </code>
+                <div className="mb-2">
+                  <div className="text-xs text-gray-600 mb-1">NLP Query:</div>
+                  <div className="text-xs bg-blue-50 p-2 rounded mb-1">{sample.nlp_query}</div>
+                  <div className="text-xs text-gray-600 mb-1">Generated SQL:</div>
+                  <code className="text-xs bg-gray-800 text-green-400 p-2 rounded block">
+                    {sample.sql}
+                  </code>
+                </div>
                 {sample.results && sample.results.length > 0 && (
                   <div className="text-xs text-gray-600">
                     Found {sample.results.length} row(s) with {Object.keys(sample.results[0]).length} column(s)
@@ -157,12 +162,10 @@ export default function ContextLoader({ contextLoaded, setContextLoaded }) {
             </div>
             
             {loadResult.success && loadResult.tables_count && (
-              <div className="text-sm text-green-700 mb-2">
+              <div className="text-sm text-green-700">
                 Loaded {loadResult.tables_count} table(s) to AI context
               </div>
             )}
-            
-            {loadResult.sample_results && formatSampleResults(loadResult.sample_results)}
           </div>
         )}
 

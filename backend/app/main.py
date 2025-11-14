@@ -83,26 +83,21 @@ async def process_query(query_id: str):
         if not db_manager or not db_manager.is_connected():
             raise Exception("No database connection for session")
         
-        # Get schema for context
-        schema = db_manager.get_schema()
-        schema_dict = [table.dict() for table in schema]
+        # Process query asynchronously
+        def process_nlp_query():
+            schema = db_manager.get_schema()
+            schema_dict = [table.dict() for table in schema]
+            sql = nlp_service.text_to_sql(queued_query.query, schema_dict, queued_query.context)
+            result = db_manager.execute_query(sql)
+            explanation = nlp_service.get_explanation(sql, queued_query.query)
+            return {
+                "sql": result["sql"],
+                "results": result["results"],
+                "execution_time": result["execution_time"],
+                "explanation": explanation
+            }
         
-        # Convert natural language to SQL
-        sql = nlp_service.text_to_sql(queued_query.query, schema_dict, queued_query.context)
-        
-        # Execute the query
-        result = db_manager.execute_query(sql)
-        
-        # Get explanation
-        explanation = nlp_service.get_explanation(sql, queued_query.query)
-        
-        query_result = {
-            "sql": result["sql"],
-            "results": result["results"],
-            "execution_time": result["execution_time"],
-            "explanation": explanation
-        }
-        
+        query_result = await asyncio.get_event_loop().run_in_executor(None, process_nlp_query)
         query_queue.update_query_status(query_id, QueryStatus.COMPLETED, result=query_result)
         
     except Exception as e:
@@ -324,35 +319,31 @@ async def load_context(session_id: str = Header(..., alias="X-Session-ID")):
         if not schema:
             raise HTTPException(status_code=400, detail="No tables found in database")
         
-        # Load context to NLP service asynchronously
-        context_loaded = await asyncio.get_event_loop().run_in_executor(None, nlp_service.load_context, schema)
-        if not context_loaded:
-            raise Exception("Failed to load context to AI model")
+        # Load context and test query asynchronously
+        async def load_and_test():
+            # Load context to NLP service
+            context_loaded = nlp_service.load_context(schema)
+            if not context_loaded:
+                raise Exception("Failed to load context to AI model")
+            
+            # Test with NLP query for first table
+            if schema:
+                first_table = schema[0]
+                nlp_query = f"Select 1 row of the {first_table.name}"
+                schema_dict = [table.dict() for table in schema]
+                generated_sql = nlp_service.text_to_sql(nlp_query, schema_dict)
+                db_manager.execute_query(generated_sql)
+            
+            return True
         
-        # Execute sample query for first table only
-        sample_results = []
-        if schema:
-            first_table = schema[0]
-            try:
-                sample_sql = f"SELECT * FROM {first_table.name} LIMIT 1"
-                result = db_manager.execute_query(sample_sql)
-                sample_results.append({
-                    "table": first_table.name,
-                    "sql": sample_sql,
-                    "results": result["results"],
-                    "execution_time": result["execution_time"]
-                })
-            except Exception as e:
-                sample_results.append({
-                    "table": first_table.name,
-                    "error": str(e)
-                })
+        # Execute asynchronously
+        await asyncio.get_event_loop().run_in_executor(None, load_and_test)
         
         return ContextLoadResponse(
             success=True,
             message="Context loaded successfully",
             tables_count=len(schema),
-            sample_results=sample_results
+            sample_results=[]
         )
         
     except HTTPException:
@@ -363,16 +354,7 @@ async def load_context(session_id: str = Header(..., alias="X-Session-ID")):
 @app.get("/api/context/status")
 async def get_context_status(session_id: str = Header(..., alias="X-Session-ID")):
     """Get context loading status"""
-    try:
-        db_manager = session_manager.get_session(session_id)
-        if not db_manager or not db_manager.is_connected():
-            return {"loaded": False, "message": "No database connection"}
-        
-        context_loaded = nlp_service.is_context_loaded()
-        return {
-            "loaded": context_loaded,
-            "message": "Context loaded" if context_loaded else "Context not loaded"
-        }
-        
-    except Exception as e:
-        return {"loaded": False, "message": str(e)}
+    return {
+        "loaded": nlp_service.is_context_loaded(),
+        "message": "Context loaded" if nlp_service.is_context_loaded() else "Context not loaded"
+    }
