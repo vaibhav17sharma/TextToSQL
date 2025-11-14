@@ -1,11 +1,12 @@
-import { AlertCircle, Clock, Loader2, MessageSquare, Send } from 'lucide-react';
+import { AlertCircle, Clock, Loader2, MessageSquare, Send, Database } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { executeQuery } from '../services/api';
+import { executeQuery, getContextStatus } from '../services/api';
 
 export default function ChatInterface({ onStatsUpdate = null }) {
   const { state, dispatch } = useApp();
   const [input, setInput] = useState('');
+  const [contextLoaded, setContextLoaded] = useState(false);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -15,6 +16,22 @@ export default function ChatInterface({ onStatsUpdate = null }) {
   useEffect(() => {
     scrollToBottom();
   }, [state.chat.messages]);
+
+  useEffect(() => {
+    if (state.connection.isConnected && state.session.sessionId) {
+      checkContextStatus();
+    }
+  }, [state.connection.isConnected, state.session.sessionId]);
+
+  const checkContextStatus = async () => {
+    try {
+      const status = await getContextStatus(state.session.sessionId);
+      setContextLoaded(status.loaded);
+    } catch (error) {
+      console.error('Failed to check context status:', error);
+      setContextLoaded(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -127,8 +144,22 @@ export default function ChatInterface({ onStatsUpdate = null }) {
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {state.chat.messages.length === 0 ? (
           <div className="text-center text-gray-500 py-8">
-            <p>Ask me anything about your data!</p>
-            <p className="text-sm mt-2">Try: "Show me all users" or "What are the top selling products?"</p>
+            {contextLoaded ? (
+              <div>
+                <p>Ask me anything about your data!</p>
+                <p className="text-sm mt-2">Try: "Show me all users" or "What are the top selling products?"</p>
+              </div>
+            ) : (
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mx-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Database className="w-5 h-5 text-orange-600" />
+                  <span className="font-medium text-orange-800">Context Not Loaded</span>
+                </div>
+                <p className="text-sm text-orange-700">
+                  Please load the database context first using the Context Loader above for better query generation.
+                </p>
+              </div>
+            )}
           </div>
         ) : (
           state.chat.messages.map((message) => (
@@ -203,6 +234,7 @@ export default function ChatInterface({ onStatsUpdate = null }) {
             type="submit"
             disabled={!input.trim() || state.chat.loading}
             className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+            title={!contextLoaded ? 'Consider loading context first for better results' : ''}
           >
             <Send className="w-4 h-4" />
           </button>

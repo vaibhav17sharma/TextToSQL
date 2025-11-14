@@ -188,3 +188,25 @@ export const getSystemStats = async () => {
     };
   }
 };
+
+export const loadContext = async (sessionId) => {
+  try {
+    const response = await api.post('/api/context/load', {}, {
+      headers: { 'X-Session-ID': sessionId }
+    });
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.detail || 'Failed to load context');
+  }
+};
+
+export const getContextStatus = async (sessionId) => {
+  try {
+    const response = await api.get('/api/context/status', {
+      headers: { 'X-Session-ID': sessionId }
+    });
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.detail || 'Failed to get context status');
+  }
+};

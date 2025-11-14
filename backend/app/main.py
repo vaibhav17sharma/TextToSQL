@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from .models import (
     DatabaseCredentials, ConnectionResponse, SchemaResponse, 
     QueryRequest, QueryResponse, ErrorResponse, QuerySubmitResponse, QueryStatusResponse,
-    SystemStats
+    SystemStats, ContextLoadResponse
 )
 from .database import DatabaseManager
 from .nlp_service import NLPService
@@ -307,3 +307,67 @@ async def cleanup_expired_sessions():
         "stats": get_system_stats(),
         "message": "Expired sessions cleaned up"
     }
+
+@app.post("/api/context/load", response_model=ContextLoadResponse)
+async def load_context(session_id: str = Header(..., alias="X-Session-ID")):
+    """Load database schema context to the model and execute sample queries"""
+    try:
+        db_manager = session_manager.get_session(session_id)
+        if not db_manager or not db_manager.is_connected():
+            raise HTTPException(status_code=400, detail="No database connection for session")
+        
+        # Get schema
+        schema = db_manager.get_schema()
+        if not schema:
+            raise HTTPException(status_code=400, detail="No tables found in database")
+        
+        # Load context to NLP service
+        nlp_service.load_context(schema)
+        
+        # Execute sample query for first table only
+        sample_results = []
+        if schema:
+            first_table = schema[0]
+            try:
+                sample_sql = f"SELECT * FROM {first_table.name} LIMIT 1"
+                result = db_manager.execute_query(sample_sql)
+                sample_results.append({
+                    "table": first_table.name,
+                    "sql": sample_sql,
+                    "results": result["results"],
+                    "execution_time": result["execution_time"]
+                })
+            except Exception as e:
+                sample_results.append({
+                    "table": first_table.name,
+                    "error": str(e)
+                })
+        
+        return ContextLoadResponse(
+            success=True,
+            message="Context loaded successfully",
+            tables_count=len(schema),
+            sample_results=sample_results
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/context/status")
+async def get_context_status(session_id: str = Header(..., alias="X-Session-ID")):
+    """Get context loading status"""
+    try:
+        db_manager = session_manager.get_session(session_id)
+        if not db_manager or not db_manager.is_connected():
+            return {"loaded": False, "message": "No database connection"}
+        
+        context_loaded = nlp_service.is_context_loaded()
+        return {
+            "loaded": context_loaded,
+            "message": "Context loaded" if context_loaded else "Context not loaded"
+        }
+        
+    except Exception as e:
+        return {"loaded": False, "message": str(e)}

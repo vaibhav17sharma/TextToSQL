@@ -63,6 +63,8 @@ class NLPService:
     def __init__(self):
         self.model = None
         self.download_tracker = None
+        self.context_loaded = False
+        self.loaded_schema = None
         self._load_model()
     
     def _load_model(self):
@@ -211,3 +213,18 @@ Generate a SQL query for the following request.
     def get_explanation(self, sql: str, original_query: str) -> str:
         """Generate explanation for the SQL query"""
         return f"Generated SQL query for: '{original_query}'. The query retrieves data based on your natural language request."
+    
+    def load_context(self, schema: List[Dict]) -> bool:
+        """Load database schema context to the model"""
+        try:
+            self.loaded_schema = schema
+            self.context_loaded = True
+            logger.info(f"✅ Context loaded with {len(schema)} tables")
+            return True
+        except Exception as e:
+            logger.error(f"❌ Failed to load context: {e}")
+            return False
+    
+    def is_context_loaded(self) -> bool:
+        """Check if context is loaded"""
+        return self.context_loaded

@@ -4,6 +4,7 @@ import QueueMonitor from './QueueMonitor';
 import SchemaExplorer from './SchemaExplorer';
 import SessionManager from './SessionManager';
 import SystemStatus from './SystemStatus';
+import ContextLoader from './ContextLoader';
 import { getSystemStats } from '../services/api';
 
 export default function MainView() {
@@ -47,6 +48,7 @@ export default function MainView() {
           <SessionManager stats={stats} />
           <QueueMonitor stats={stats} />
         </div>
+        <ContextLoader />
         <SchemaExplorer />
       </div>
       <div className="flex-1 min-w-0">

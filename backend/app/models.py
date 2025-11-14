@@ -67,3 +67,9 @@ class QueryStatusResponse(BaseModel):
     error: Optional[str] = None
     created_at: str
     stats: Optional[SystemStats] = None
+
+class ContextLoadResponse(BaseModel):
+    success: bool
+    message: str
+    tables_count: int
+    sample_results: List[Dict[str, Any]]
