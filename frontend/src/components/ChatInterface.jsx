@@ -3,10 +3,9 @@ import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { executeQuery, getContextStatus } from '../services/api';
 
-export default function ChatInterface({ onStatsUpdate = null }) {
+export default function ChatInterface({ onStatsUpdate = null, contextLoaded, setContextLoaded }) {
   const { state, dispatch } = useApp();
   const [input, setInput] = useState('');
-  const [contextLoaded, setContextLoaded] = useState(false);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -71,6 +70,9 @@ export default function ChatInterface({ onStatsUpdate = null }) {
 
       dispatch({ type: 'ADD_MESSAGE', payload: assistantMessage });
       dispatch({ type: 'SET_CHAT_LOADING', payload: false });
+      
+      // Refresh context status after query completion
+      checkContextStatus();
     } catch (error) {
       dispatch({ type: 'SET_CHAT_ERROR', payload: error.message });
       const errorMessage = {
@@ -80,6 +82,7 @@ export default function ChatInterface({ onStatsUpdate = null }) {
         timestamp: new Date()
       };
       dispatch({ type: 'ADD_MESSAGE', payload: errorMessage });
+      dispatch({ type: 'SET_CHAT_LOADING', payload: false });
     }
   };
 

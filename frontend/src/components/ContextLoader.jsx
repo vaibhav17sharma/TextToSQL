@@ -3,7 +3,7 @@ import { Database, Loader2, CheckCircle, AlertCircle, Play } from 'lucide-react'
 import { useApp } from '../context/AppContext';
 import { loadContext, getContextStatus } from '../services/api';
 
-export default function ContextLoader() {
+export default function ContextLoader({ contextLoaded, setContextLoaded }) {
   const { state } = useApp();
   const [loading, setLoading] = useState(false);
   const [contextStatus, setContextStatus] = useState({ loaded: false, message: '' });
@@ -19,8 +19,10 @@ export default function ContextLoader() {
     try {
       const status = await getContextStatus(state.session.sessionId);
       setContextStatus(status);
+      setContextLoaded(status.loaded);
     } catch (error) {
       console.error('Failed to check context status:', error);
+      setContextLoaded(false);
     }
   };
 
@@ -38,9 +40,10 @@ export default function ContextLoader() {
         )
       ]);
       setLoadResult(result);
-      setContextStatus({ loaded: true, message: 'Context loaded successfully' });
+      await checkContextStatus(); // Refresh status after loading
     } catch (error) {
       setLoadResult({ success: false, message: error.message });
+      await checkContextStatus(); // Check status even on error
     } finally {
       setLoading(false);
     }

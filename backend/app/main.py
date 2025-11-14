@@ -271,6 +271,9 @@ async def connection_status(session_id: str = Header(..., alias="X-Session-ID"))
 async def disconnect(session_id: str = Header(..., alias="X-Session-ID")):
     try:
         session_manager.cleanup_session(session_id)
+        # Clear context when disconnecting
+        nlp_service.context_loaded = False
+        nlp_service.loaded_schema = None
         return {"success": True, "message": "Disconnected successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -322,7 +325,9 @@ async def load_context(session_id: str = Header(..., alias="X-Session-ID")):
             raise HTTPException(status_code=400, detail="No tables found in database")
         
         # Load context to NLP service asynchronously
-        await asyncio.get_event_loop().run_in_executor(None, nlp_service.load_context, schema)
+        context_loaded = await asyncio.get_event_loop().run_in_executor(None, nlp_service.load_context, schema)
+        if not context_loaded:
+            raise Exception("Failed to load context to AI model")
         
         # Execute sample query for first table only
         sample_results = []
