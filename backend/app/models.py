@@ -51,9 +51,19 @@ class QuerySubmitResponse(BaseModel):
     status: str
     message: str
 
+class SystemStats(BaseModel):
+    active_sessions: int
+    total_queries: int
+    queued: int
+    processing: int
+    completed: int
+    failed: int
+    queue_size: int
+
 class QueryStatusResponse(BaseModel):
     query_id: str
     status: str
     result: Optional[QueryResponse] = None
     error: Optional[str] = None
     created_at: str
+    stats: Optional[SystemStats] = None

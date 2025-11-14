@@ -8,7 +8,8 @@ from typing import Optional
 from contextlib import asynccontextmanager
 from .models import (
     DatabaseCredentials, ConnectionResponse, SchemaResponse, 
-    QueryRequest, QueryResponse, ErrorResponse, QuerySubmitResponse, QueryStatusResponse
+    QueryRequest, QueryResponse, ErrorResponse, QuerySubmitResponse, QueryStatusResponse,
+    SystemStats
 )
 from .database import DatabaseManager
 from .nlp_service import NLPService
@@ -182,7 +183,7 @@ async def connect_database_file(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/api/schema", response_model=SchemaResponse)
-def get_schema(session_id: str = Header(..., alias="X-Session-ID")):
+async def get_schema(session_id: str = Header(..., alias="X-Session-ID")):
     try:
         db_manager = session_manager.get_session(session_id)
         if not db_manager or not db_manager.is_connected():
@@ -194,7 +195,7 @@ def get_schema(session_id: str = Header(..., alias="X-Session-ID")):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/schema/refresh", response_model=SchemaResponse)
-def refresh_schema(session_id: str = Header(..., alias="X-Session-ID")):
+async def refresh_schema(session_id: str = Header(..., alias="X-Session-ID")):
     try:
         db_manager = session_manager.get_session(session_id)
         if not db_manager or not db_manager.is_connected():
@@ -228,7 +229,7 @@ async def submit_query(request: QueryRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/query/{query_id}/status", response_model=QueryStatusResponse)
-def get_query_status(query_id: str):
+async def get_query_status(query_id: str):
     try:
         queued_query = query_queue.get_query_status(query_id)
         if not queued_query:
@@ -238,12 +239,16 @@ def get_query_status(query_id: str):
         if queued_query.status == QueryStatus.COMPLETED and queued_query.result:
             result = QueryResponse(**queued_query.result)
         
+        # Include system stats in response
+        stats = get_system_stats()
+        
         return QueryStatusResponse(
             query_id=query_id,
             status=queued_query.status.value,
             result=result,
             error=queued_query.error,
-            created_at=queued_query.created_at.isoformat()
+            created_at=queued_query.created_at.isoformat(),
+            stats=stats
         )
         
     except HTTPException:
@@ -252,7 +257,7 @@ def get_query_status(query_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/connection/status")
-def connection_status(session_id: str = Header(..., alias="X-Session-ID")):
+async def connection_status(session_id: str = Header(..., alias="X-Session-ID")):
     db_manager = session_manager.get_session(session_id)
     if not db_manager:
         return {"connected": False, "connection_info": None}
@@ -263,45 +268,42 @@ def connection_status(session_id: str = Header(..., alias="X-Session-ID")):
     }
 
 @app.post("/api/disconnect")
-def disconnect(session_id: str = Header(..., alias="X-Session-ID")):
+async def disconnect(session_id: str = Header(..., alias="X-Session-ID")):
     try:
         session_manager.cleanup_session(session_id)
         return {"success": True, "message": "Disconnected successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/sessions/stats")
-def get_session_stats():
-    """Get current session statistics"""
-    return {
-        "active_sessions": session_manager.get_session_count(),
-        "message": "Session statistics"
-    }
-
-@app.post("/api/sessions/cleanup")
-def cleanup_expired_sessions():
-    """Manually trigger cleanup of expired sessions"""
-    session_manager.cleanup_expired_sessions()
-    return {
-        "success": True,
-        "active_sessions": session_manager.get_session_count(),
-        "message": "Expired sessions cleaned up"
-    }
-
-@app.get("/api/queue/stats")
-def get_queue_stats():
-    """Get current queue statistics"""
+def get_system_stats() -> SystemStats:
+    """Get current system statistics"""
     total_queries = len(query_queue.queries)
     queued = sum(1 for q in query_queue.queries.values() if q.status == QueryStatus.QUEUED)
     processing = sum(1 for q in query_queue.queries.values() if q.status == QueryStatus.PROCESSING)
     completed = sum(1 for q in query_queue.queries.values() if q.status == QueryStatus.COMPLETED)
     failed = sum(1 for q in query_queue.queries.values() if q.status == QueryStatus.FAILED)
     
+    return SystemStats(
+        active_sessions=session_manager.get_session_count(),
+        total_queries=total_queries,
+        queued=queued,
+        processing=processing,
+        completed=completed,
+        failed=failed,
+        queue_size=query_queue.queue.qsize()
+    )
+
+@app.get("/api/system/stats", response_model=SystemStats)
+async def get_stats():
+    """Get current system statistics - lightweight endpoint"""
+    return get_system_stats()
+
+@app.post("/api/sessions/cleanup")
+async def cleanup_expired_sessions():
+    """Manually trigger cleanup of expired sessions"""
+    session_manager.cleanup_expired_sessions()
     return {
-        "total_queries": total_queries,
-        "queued": queued,
-        "processing": processing,
-        "completed": completed,
-        "failed": failed,
-        "queue_size": query_queue.queue.qsize()
+        "success": True,
+        "stats": get_system_stats(),
+        "message": "Expired sessions cleaned up"
     }

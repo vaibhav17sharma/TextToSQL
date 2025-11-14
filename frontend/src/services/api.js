@@ -98,7 +98,7 @@ export const getQueryStatus = async (queryId) => {
   }
 };
 
-export const executeQuery = async (query, sessionId) => {
+export const executeQuery = async (query, sessionId, onStatsUpdate = null) => {
   // Submit query and poll for result
   const submission = await submitQuery(query, sessionId);
   
@@ -107,9 +107,17 @@ export const executeQuery = async (query, sessionId) => {
       try {
         const status = await getQueryStatus(submission.query_id);
         
+        // Update stats if callback provided
+        if (onStatsUpdate && status.stats) {
+          onStatsUpdate(status.stats);
+        }
+        
         if (status.status === 'completed') {
           clearInterval(pollInterval);
-          resolve(status.result);
+          resolve({
+            result: status.result,
+            stats: status.stats
+          });
         } else if (status.status === 'failed') {
           clearInterval(pollInterval);
           reject(new Error(status.error || 'Query failed'));
@@ -162,23 +170,15 @@ export const getConnectionStatus = async (sessionId) => {
   }
 };
 
-export const getSessionStats = async () => {
+export const getSystemStats = async () => {
   try {
-    const response = await api.get('/api/sessions/stats');
+    const response = await api.get('/api/system/stats');
     return response.data;
   } catch (error) {
-    throw new Error(error.response?.data?.detail || 'Failed to get session stats');
-  }
-};
-
-export const getQueueStats = async () => {
-  try {
-    const response = await api.get('/api/queue/stats');
-    return response.data;
-  } catch (error) {
-    console.error('Queue stats error:', error);
+    console.error('System stats error:', error);
     // Return mock data if API fails
     return {
+      active_sessions: 0,
       total_queries: 0,
       queued: 0,
       processing: 0,

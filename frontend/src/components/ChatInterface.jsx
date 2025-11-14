@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { executeQuery } from '../services/api';
 
-export default function ChatInterface() {
+export default function ChatInterface({ onStatsUpdate = null }) {
   const { state, dispatch } = useApp();
   const [input, setInput] = useState('');
   const messagesEndRef = useRef(null);
@@ -34,7 +34,16 @@ export default function ChatInterface() {
     setInput('');
 
     try {
-      const result = await executeQuery(input, state.session.sessionId);
+      const { result, stats } = await executeQuery(
+        input, 
+        state.session.sessionId,
+        onStatsUpdate
+      );
+      
+      // Update stats if available
+      if (stats && onStatsUpdate) {
+        onStatsUpdate(stats);
+      }
       
       const assistantMessage = {
         id: Date.now() + 1,
