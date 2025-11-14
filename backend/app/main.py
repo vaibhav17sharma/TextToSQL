@@ -104,11 +104,23 @@ async def process_query(query_id: str):
         error_message = nlp_service.format_error_with_query(str(e), "", queued_query.query) if hasattr(nlp_service, 'format_error_with_query') else str(e)
         query_queue.update_query_status(query_id, QueryStatus.FAILED, error=error_message)
 
+# CORS configuration for different environments
+allowed_origins = [
+    "http://localhost:5173",  # Vite dev server
+    "http://localhost:3000",  # Production frontend
+    "http://127.0.0.1:3000",  # Alternative localhost
+]
+
+# In Docker production, requests come through Nginx proxy
+if os.getenv("ENV") == "production":
+    allowed_origins = ["*"]  # Allow all origins since requests come through Nginx
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=allowed_origins,
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_credentials=True,
 )
 
 # Global instances
@@ -119,6 +131,15 @@ query_queue = QueryQueue()
 @app.get("/")
 def read_root():
     return {"message": "Text to SQL Converter API"}
+
+@app.get("/health")
+def health_check():
+    """Health check endpoint for monitoring"""
+    return {
+        "status": "healthy",
+        "service": "Text to SQL Converter API",
+        "version": "1.0.0"
+    }
 
 @app.post("/api/connect-db", response_model=ConnectionResponse)
 async def connect_database(credentials: DatabaseCredentials):

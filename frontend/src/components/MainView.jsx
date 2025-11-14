@@ -2,9 +2,8 @@ import { useState, useEffect } from 'react';
 import ChatInterface from './ChatInterface';
 import QueueMonitor from './QueueMonitor';
 import SchemaExplorer from './SchemaExplorer';
-import SessionManager from './SessionManager';
-import SystemStatus from './SystemStatus';
-import ContextLoader from './ContextLoader';
+import SystemOverview from './SystemOverview';
+
 import { useApp } from '../context/AppContext';
 import { getSystemStats, getContextStatus } from '../services/api';
 
@@ -64,12 +63,9 @@ export default function MainView() {
   return (
     <div className="flex flex-col lg:flex-row h-full gap-6 w-full">
       <div className="lg:w-1/3 min-w-0 space-y-4 overflow-y-auto">
-        <SystemStatus stats={stats} />
-        <div className="grid grid-cols-1 gap-4">
-          <SessionManager stats={stats} />
-          <QueueMonitor stats={stats} />
-        </div>
-        <ContextLoader contextLoaded={contextLoaded} setContextLoaded={setContextLoaded} />
+        <SystemOverview stats={stats} />
+        <QueueMonitor stats={stats} />
+
         <SchemaExplorer />
       </div>
       <div className="flex-1 min-w-0">

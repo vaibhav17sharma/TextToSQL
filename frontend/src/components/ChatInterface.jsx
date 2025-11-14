@@ -153,13 +153,13 @@ export default function ChatInterface({ onStatsUpdate = null, contextLoaded, set
                 <p className="text-sm mt-2">Try: "Show me all users" or "What are the top selling products?"</p>
               </div>
             ) : (
-              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mx-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mx-4">
                 <div className="flex items-center gap-2 mb-2">
-                  <Database className="w-5 h-5 text-orange-600" />
-                  <span className="font-medium text-orange-800">Context Not Loaded</span>
+                  <Database className="w-5 h-5 text-blue-600" />
+                  <span className="font-medium text-blue-800">Ready to Query</span>
                 </div>
-                <p className="text-sm text-orange-700">
-                  Please load the database context first using the Context Loader above for better query generation.
+                <p className="text-sm text-blue-700">
+                  Ask me anything about your data! Note: The first query may take a moment as the AI model loads the database context.
                 </p>
               </div>
             )}
@@ -237,7 +237,7 @@ export default function ChatInterface({ onStatsUpdate = null, contextLoaded, set
             type="submit"
             disabled={!input.trim() || state.chat.loading}
             className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
-            title={!contextLoaded ? 'Consider loading context first for better results' : ''}
+title="Send query"
           >
             <Send className="w-4 h-4" />
           </button>

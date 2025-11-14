@@ -2,28 +2,28 @@ version: '3.8'
 
 services:
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
     restart: unless-stopped
     ports:
-      - "3000:5173"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
+      - "3000:80"
     depends_on:
       - backend
     networks:
       - texttosql-network
 
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
     restart: unless-stopped
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./backend:/app
-      - model_cache:/app/models  # Cache the downloaded AI model
+    # No external port mapping - only accessible via Docker network
     environment:
       - PYTHONPATH=/app
+      - ENV=production
+    volumes:
+      - model_cache:/app/models  # Cache the downloaded AI model
     depends_on:
       - postgres
     networks:
