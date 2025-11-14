@@ -112,7 +112,7 @@ export default function ContextLoader({ contextLoaded, setContextLoaded }) {
           <span className="text-sm text-gray-700">{contextStatus.message}</span>
         </div>
 
-        {!contextStatus.loaded && (
+        {!contextStatus.loaded && !loadResult?.success && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
             <p className="text-sm text-blue-800 mb-3">
               Load database schema to the AI model for better query generation. This will also run a sample query on the first table to preview your data.
