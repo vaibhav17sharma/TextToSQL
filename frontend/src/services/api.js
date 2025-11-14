@@ -103,7 +103,10 @@ export const executeQuery = async (query, sessionId, onStatsUpdate = null) => {
   const submission = await submitQuery(query, sessionId);
   
   return new Promise((resolve, reject) => {
-    const pollInterval = setInterval(async () => {
+    let pollCount = 0;
+    let pollTimeout;
+    
+    const poll = async () => {
       try {
         const status = await getQueryStatus(submission.query_id);
         
@@ -113,27 +116,42 @@ export const executeQuery = async (query, sessionId, onStatsUpdate = null) => {
         }
         
         if (status.status === 'completed') {
-          clearInterval(pollInterval);
           resolve({
             result: status.result,
             stats: status.stats
           });
+          return;
         } else if (status.status === 'failed') {
-          clearInterval(pollInterval);
           reject(new Error(status.error || 'Query failed'));
+          return;
         }
-        // Continue polling if status is 'queued' or 'processing'
+        
+        // Schedule next poll with adaptive interval
+        pollCount++;
+        let nextInterval;
+        if (pollCount <= 5) {
+          nextInterval = 1000; // 1 sec for first 5 polls
+        } else if (pollCount <= 15) {
+          nextInterval = 3000; // 3 sec for next 10 polls (30 sec total)
+        } else {
+          nextInterval = 5000; // 5 sec after that
+        }
+        
+        pollTimeout = setTimeout(poll, nextInterval);
+        
       } catch (error) {
-        clearInterval(pollInterval);
         reject(error);
       }
-    }, 1000); // Poll every second
+    };
     
-    // Timeout after 60 seconds
+    // Start polling
+    poll();
+    
+    // Timeout after 5 minutes
     setTimeout(() => {
-      clearInterval(pollInterval);
+      clearTimeout(pollTimeout);
       reject(new Error('Query timeout'));
-    }, 60000);
+    }, 300000);
   });
 };
 
