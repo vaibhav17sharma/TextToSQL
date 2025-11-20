@@ -18,32 +18,17 @@ services:
     build: ./backend
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "8000:8000"  # Expose for development/debugging
     volumes:
       - ./backend:/app
+      - ./database:/app/database  # Mount sample database
       - model_cache:/app/models  # Cache the downloaded AI model
     environment:
       - PYTHONPATH=/app
-    depends_on:
-      - postgres
-    networks:
-      - texttosql-network
-
-  postgres:
-    image: postgres:15
-    restart: unless-stopped
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=testdb
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./database/postgres:/docker-entrypoint-initdb.d:ro
     networks:
       - texttosql-network
 
 volumes:
-  postgres_data:
   model_cache:  # Persistent storage for AI model
 
 networks:

@@ -29,7 +29,7 @@ AI/ML powered application that converts natural language text to SQL queries.
 
 - **Frontend**: React
 - **Backend**: FastAPI
-- **Database**: MySQL & PostgreSQL
+- **Database**: MySQL, PostgreSQL & SQLite (user-provided)
 - **AI/ML**: Natural language processing for SQL generation
 - **Model**: mradermacher/natural-sql-7b-i1-GGUF
 
@@ -39,6 +39,7 @@ AI/ML powered application that converts natural language text to SQL queries.
 - Real-time query generation
 - Clean, intuitive interface
 - Multi-database support
+- One-click sample database loading
 
 ## 🚀 Deployment
 
@@ -65,7 +66,7 @@ Access the application at http://localhost:3000
 ### Deployment Options
 
 #### 🐳 Docker (Recommended)
-**Advantages:** Isolated environment, easy scaling, includes database
+**Advantages:** Isolated environment, easy scaling
 
 ```bash
 # Production
@@ -81,7 +82,7 @@ make stop
 **Access:**
 - Frontend: http://localhost:3000
 - Backend API: http://localhost:3000/api (via Nginx proxy)
-- Database: PostgreSQL (internal network)
+- Database: Connect to your own PostgreSQL/MySQL/SQLite database
 
 #### ⚡ PM2 Process Manager
 **Advantages:** Process management, auto-restart, load balancing
@@ -127,7 +128,14 @@ PYTHONPATH=/app
 DATABASE_URL=postgresql://user:pass@host:5432/dbname
 ```
 
-#### External Database Setup
+#### Database Setup
+The application supports multiple database types:
+- **Sample Database**: Click "Load Sample Database" for instant demo with e-commerce data
+- **PostgreSQL**: Create a database and user with appropriate permissions
+- **MySQL**: Create a database and user with appropriate permissions  
+- **SQLite**: Upload your own .db file through the interface
+
+**Example PostgreSQL setup:**
 ```sql
 CREATE DATABASE textosql;
 CREATE USER texttosql WITH PASSWORD 'your_password';
@@ -170,20 +178,17 @@ curl http://localhost:3000
 curl http://localhost:3000/api/health
 ```
 
-### Backup & Recovery
+### Database Connection
 
-```bash
-# Backup
-docker exec postgres_container pg_dump -U postgres testdb > backup.sql
-
-# Restore
-docker exec -i postgres_container psql -U postgres testdb < backup.sql
-```
+The application supports multiple database types:
+- Connect via credentials (PostgreSQL/MySQL)
+- Upload SQLite files
+- Real-time schema detection and query generation
 
 ## Architecture
 
 - **Frontend**: React app with Nginx (port 3000)
 - **Backend**: FastAPI on internal Docker network
-- **Database**: PostgreSQL (internal network)
+- **Database**: User-provided (PostgreSQL/MySQL/SQLite)
 - **AI Model**: 4GB cached in persistent volume
 - **Security**: Backend only accessible via proxy

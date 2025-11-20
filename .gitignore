@@ -46,6 +46,8 @@ pubspec.lock
 *.db
 *.sqlite
 *.sql.bak
+# Exception: keep sample database
+!database/sample_ecommerce.db
 
 # Docker
 *.pid

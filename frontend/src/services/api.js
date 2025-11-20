@@ -228,3 +228,14 @@ export const getContextStatus = async (sessionId) => {
     throw new Error(error.response?.data?.detail || 'Failed to get context status');
   }
 };
+
+export const downloadSampleDatabase = async () => {
+  try {
+    const response = await api.get('/api/sample-database', {
+      responseType: 'blob'
+    });
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.detail || 'Failed to download sample database');
+  }
+};

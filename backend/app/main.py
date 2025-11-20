@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File, Header
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 import os
 import tempfile
 import logging
@@ -379,3 +380,29 @@ async def get_context_status(session_id: str = Header(..., alias="X-Session-ID")
         "loaded": nlp_service.is_context_loaded(),
         "message": "Context loaded" if nlp_service.is_context_loaded() else "Context not loaded"
     }
+
+@app.get("/api/sample-database")
+async def download_sample_database():
+    """Download the sample SQLite database file"""
+    # Try multiple possible paths for the sample database
+    possible_paths = [
+        "/app/database/sample_ecommerce.db",  # Docker mounted path
+        os.path.join(os.path.dirname(__file__), "..", "..", "database", "sample_ecommerce.db"),  # Relative path
+        "database/sample_ecommerce.db"  # Current directory relative
+    ]
+    
+    sample_db_path = None
+    for path in possible_paths:
+        abs_path = os.path.abspath(path)
+        if os.path.exists(abs_path):
+            sample_db_path = abs_path
+            break
+    
+    if not sample_db_path:
+        raise HTTPException(status_code=404, detail=f"Sample database not found. Tried: {possible_paths}")
+    
+    return FileResponse(
+        path=sample_db_path,
+        filename="sample_ecommerce.db",
+        media_type="application/octet-stream"
+    )

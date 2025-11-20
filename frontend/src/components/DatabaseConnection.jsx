@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Database, Upload, Loader2 } from 'lucide-react';
+import { Database, Upload, Loader2, Download } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { connectDatabase, connectDatabaseFile, getSchema } from '../services/api';
+import { connectDatabase, connectDatabaseFile, getSchema, downloadSampleDatabase } from '../services/api';
 
 export default function DatabaseConnection() {
   const { state, dispatch } = useApp();
@@ -49,6 +49,24 @@ export default function DatabaseConnection() {
     dispatch({ type: 'SET_CONNECTION_LOADING', payload: true });
     
     try {
+      const result = await connectDatabaseFile(file);
+      dispatch({ type: 'SET_CONNECTION_SUCCESS', payload: result });
+      
+      dispatch({ type: 'SET_SCHEMA_LOADING', payload: true });
+      const schema = await getSchema(result.session_id);
+      dispatch({ type: 'SET_SCHEMA_SUCCESS', payload: schema.tables });
+    } catch (error) {
+      dispatch({ type: 'SET_CONNECTION_ERROR', payload: error.message });
+    }
+  };
+
+  const handleLoadSampleDatabase = async () => {
+    dispatch({ type: 'SET_CONNECTION_LOADING', payload: true });
+    
+    try {
+      const blob = await downloadSampleDatabase();
+      const file = new File([blob], 'sample_ecommerce.db', { type: 'application/octet-stream' });
+      
       const result = await connectDatabaseFile(file);
       dispatch({ type: 'SET_CONNECTION_SUCCESS', payload: result });
       
@@ -220,6 +238,20 @@ export default function DatabaseConnection() {
           {state.connection.error}
         </div>
       )}
+
+      <div className="mt-6 pt-4 border-t border-gray-200">
+        <div className="text-center">
+          <p className="text-sm text-gray-600 mb-3">Or try with sample data</p>
+          <button
+            onClick={handleLoadSampleDatabase}
+            disabled={state.connection.loading}
+            className="px-6 py-2 rounded-md text-sm font-medium bg-green-100 text-green-700 border border-green-300 hover:bg-green-200 disabled:opacity-50 flex items-center gap-2 mx-auto"
+          >
+            <Download className="w-4 h-4" />
+            Load Sample Database
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
